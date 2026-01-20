@@ -90,6 +90,27 @@ class CommitmentGraph:
     
     async def track_and_detect(self, commitment_data: Dict[str, Any], spending_data: list) -> Dict[str, Any]:
         """Run the tracking and drift detection workflow."""
+        # Create a subgraph starting from detect_drift
+        tracking_graph = StateGraph(CommitmentState)
+        
+        tracking_graph.add_node("detect_drift", detect_drift_node)
+        tracking_graph.add_node("intervene", intervene_node)
+        tracking_graph.add_node("evaluate", evaluate_node)
+        
+        tracking_graph.set_entry_point("detect_drift")
+        tracking_graph.add_conditional_edges(
+            "detect_drift",
+            should_intervene,
+            {
+                "intervene": "intervene",
+                "evaluate": "evaluate"
+            }
+        )
+        tracking_graph.add_edge("intervene", "evaluate")
+        tracking_graph.add_edge("evaluate", END)
+        
+        compiled_tracking = tracking_graph.compile()
+        
         initial_state: CommitmentState = {
             "user_input": {},
             "structured_goal": {},
@@ -103,5 +124,5 @@ class CommitmentGraph:
             "status": "tracking"
         }
         
-        result = await self.graph.ainvoke(initial_state, {"recursion_limit": 50})
+        result = await compiled_tracking.ainvoke(initial_state)
         return result

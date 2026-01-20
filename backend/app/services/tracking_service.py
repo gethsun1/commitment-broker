@@ -63,8 +63,28 @@ class TrackingService:
             "weeks_remaining": commitment.goal_timeframe_weeks - len(set(s.week_number for s in spending_logs))
         }
         
-        # Generate intervention
-        intervention_data = await self.gemini.generate_intervention(drift_analysis, commitment_data)
+        # Generate intervention (rule-based for demo - can use LLM in production)
+        severity = drift_analysis.get("severity", "low")
+        deviation_amount = drift_analysis.get("deviation_amount", 0)
+        
+        if severity == "high":
+            intervention_data = {
+                "type": "goal_renegotiation",
+                "message": f"You've exceeded your spending limit by ${deviation_amount:.2f} this week. This suggests your goals might need adjustment. Would you like to discuss renegotiating your commitment?",
+                "tone": "collaborative"
+            }
+        elif severity == "medium":
+            intervention_data = {
+                "type": "recommitment_prompt",
+                "message": f"You've overspent by ${deviation_amount:.2f} this week. Let's recommit to your goal and get back on track for the remaining weeks.",
+                "tone": "firm"
+            }
+        else:
+            intervention_data = {
+                "type": "gentle_warning",
+                "message": f"Gentle reminder: You're slightly over your spending limit by ${deviation_amount:.2f}. No worries - let's stay mindful this week!",
+                "tone": "supportive"
+            }
         
         # Map to InterventionType enum
         type_mapping = {

@@ -1,5 +1,7 @@
 # Commitment Broker
 
+![Commitment Broker Cover](frontend/public/assets/commitmentbroker_cover.png)
+
 **Turning Financial Resolutions into Measurable Commitments**
 
 Commitment Broker is an AI agent system designed to solve a familiar failure: people do not fail at setting financial goals — they fail at sticking to them.

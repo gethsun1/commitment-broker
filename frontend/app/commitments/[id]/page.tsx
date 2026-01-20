@@ -3,11 +3,14 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { CommitmentCard } from "@/components/CommitmentCard";
 import { SpendingTracker } from "@/components/SpendingTracker";
 import { InterventionAlert } from "@/components/InterventionAlert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MetricStat } from "@/components/MetricStat";
+import { InterventionBadge } from "@/components/InterventionBadge";
 import { apiClient, Commitment, Spending, Intervention, Evaluation, Drift } from "@/lib/api";
 
 export default function CommitmentPage() {
@@ -67,9 +70,9 @@ export default function CommitmentPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
-        <div className="max-w-6xl mx-auto">
-          <p>Loading...</p>
+      <div className="min-h-screen bg-background py-12">
+        <div className="container mx-auto px-4 max-w-6xl">
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -77,30 +80,38 @@ export default function CommitmentPage() {
 
   if (!commitment) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
-        <div className="max-w-6xl mx-auto">
-          <p>Commitment not found.</p>
+      <div className="min-h-screen bg-background py-12">
+        <div className="container mx-auto px-4 max-w-6xl">
+          <p className="text-foreground">Commitment not found.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
-      <div className="max-w-6xl mx-auto space-y-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <Link href="/">
-              <Button variant="outline">← Back to Dashboard</Button>
-            </Link>
-          </div>
-        </div>
+    <div className="min-h-screen bg-background py-12">
+      <div className="container mx-auto px-4 max-w-6xl space-y-10">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="flex items-center justify-between"
+        >
+          <Link href="/">
+            <Button variant="outline">← Back to Dashboard</Button>
+          </Link>
+        </motion.div>
 
         <CommitmentCard commitment={commitment} />
 
         {interventions.length > 0 && (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Interventions</h2>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+            className="space-y-4"
+          >
+            <h2 className="text-section-heading">Interventions</h2>
             {interventions.map((intervention) => (
               <InterventionAlert
                 key={intervention.id}
@@ -108,75 +119,107 @@ export default function CommitmentPage() {
                 onOutcomeUpdate={handleOutcomeUpdate}
               />
             ))}
-          </div>
+          </motion.div>
         )}
 
-        <SpendingTracker
-          commitmentId={commitmentId}
-          spendingLogs={spendingLogs}
-          onSpendingAdded={handleSpendingAdded}
-        />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+        >
+          <SpendingTracker
+            commitmentId={commitmentId}
+            spendingLogs={spendingLogs}
+            onSpendingAdded={handleSpendingAdded}
+          />
+        </motion.div>
 
         {evaluation && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Evaluation Metrics</CardTitle>
-              <CardDescription>Performance tracking and adherence metrics</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Adherence Rate</p>
-                  <p className="text-2xl font-bold">{evaluation.adherence_rate.toFixed(1)}%</p>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.3 }}
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-section-heading">Evaluation Metrics</CardTitle>
+                <CardDescription className="text-base">
+                  Performance tracking and adherence metrics
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  <MetricStat
+                    label="Adherence Rate"
+                    value={`${evaluation.adherence_rate.toFixed(1)}%`}
+                  />
+                  <MetricStat
+                    label="Weeks Tracked"
+                    value={evaluation.weeks_tracked}
+                  />
+                  <MetricStat
+                    label="Weeks Compliant"
+                    value={evaluation.weeks_compliant}
+                  />
+                  {evaluation.intervention_success_rate !== null && (
+                    <MetricStat
+                      label="Intervention Success"
+                      value={`${evaluation.intervention_success_rate.toFixed(1)}%`}
+                    />
+                  )}
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Weeks Tracked</p>
-                  <p className="text-2xl font-bold">{evaluation.weeks_tracked}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Weeks Compliant</p>
-                  <p className="text-2xl font-bold">{evaluation.weeks_compliant}</p>
-                </div>
-                {evaluation.intervention_success_rate !== null && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Intervention Success</p>
-                    <p className="text-2xl font-bold">
-                      {evaluation.intervention_success_rate.toFixed(1)}%
-                    </p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </motion.div>
         )}
 
         {drift && drift.has_drift && (
-          <Card className="border-orange-500">
-            <CardHeader>
-              <CardTitle>Drift Detected</CardTitle>
-              <CardDescription>
-                {drift.description || "Spending pattern deviation detected"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <p className="text-sm">
-                  <span className="font-medium">Type:</span> {drift.drift_type}
-                </p>
-                {drift.severity && (
-                  <p className="text-sm">
-                    <span className="font-medium">Severity:</span> {drift.severity}
-                  </p>
-                )}
-                {drift.deviation_amount && (
-                  <p className="text-sm">
-                    <span className="font-medium">Deviation:</span> $
-                    {drift.deviation_amount.toFixed(2)}
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.4 }}
+          >
+            <Card className="border-secondary/40">
+              <CardHeader>
+                <CardTitle className="text-section-heading">Drift Detected</CardTitle>
+                <CardDescription className="text-base">
+                  {drift.description || "Spending pattern deviation detected"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <InterventionBadge
+                      intervention={{
+                        id: 0,
+                        commitment_id: commitmentId,
+                        type: "gentle_warning",
+                        message: "",
+                        drift_type: drift.drift_type,
+                        triggered_at: new Date().toISOString(),
+                      }}
+                    />
+                    {drift.severity && (
+                      <>
+                        <span className="text-muted-foreground">•</span>
+                        <span className="text-sm text-muted-foreground capitalize">
+                          {drift.severity}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {drift.deviation_amount && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Deviation Amount</p>
+                      <p className="text-xl font-semibold text-secondary">
+                        ${drift.deviation_amount.toFixed(2)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         )}
       </div>
     </div>
