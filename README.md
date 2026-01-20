@@ -249,7 +249,7 @@ Commitment Broker treats evaluation as a product feature, not an afterthought.
 - `GET /api/commitments/{id}/evaluation` — Get evaluation metrics
 - `PATCH /api/interventions/{id}/outcome` — Update intervention outcome
 
-## Demo Scenario (Judge-Oriented)
+## Demo Scenario
 
 The seeded demo illustrates a complete behavioral loop:
 
