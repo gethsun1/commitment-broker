@@ -234,7 +234,7 @@ Commitment Broker treats evaluation as a product feature, not an afterthought.
 - Agent logic strategies
 - Intervention timing policies
 
-### Judges Can Inspect
+### Inspect
 - Agent traces
 - Evaluation dashboards
 - Before/after behavioral outcomes
