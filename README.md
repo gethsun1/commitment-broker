@@ -1,31 +1,113 @@
 # Commitment Broker
 
-An AI agent system that converts financial goals into enforceable behavioral commitments, tracks adherence over time, detects deviation patterns, and intervenes intelligently.
+**Turning Financial Resolutions into Measurable Commitments**
 
-## Features
+Commitment Broker is an AI agent system designed to solve a familiar failure: people do not fail at setting financial goals — they fail at sticking to them.
 
-- **Goal Intake**: Collect financial goals with amount, timeframe, income frequency, and risk moments
-- **Commitment Engine**: Generate weekly savings targets and behavioral constraints
-- **Behavior Tracking**: Accept spending data and aggregate by week
-- **Drift Detection**: Detect overspending, missed contributions, and classify drift types
-- **Intervention Agent**: Trigger contextual interventions (gentle warnings, recommitment prompts, goal renegotiation)
-- **Evaluation & Observability**: Track adherence rates, intervention success, and compare agent performance via Opik
+This project transforms abstract financial intentions into structured behavioral commitments, continuously monitors real-world adherence, detects behavioral drift, and intervenes intelligently. Most importantly, the system evaluates itself, learning which interventions actually help users follow through.
 
-## Tech Stack
+**Built for real users. Designed for measurable change. Engineered with observability at its core.**
+
+## Why Commitment Broker Exists
+
+New Year's resolutions fail not due to lack of motivation, but lack of structure, feedback, and accountability.
+
+Commitment Broker addresses this gap by:
+
+- **Converting goals into enforceable weekly commitments**
+- **Detecting early signs of behavioral drift**
+- **Intervening before failure becomes abandonment**
+- **Measuring whether the AI itself is helping — or merely talking**
+
+> This is not a budgeting app.  
+> It is a behavioral commitment engine.
+
+## Core Capabilities
+
+### Goal Structuring
+- Collects financial goals (amount, timeframe, income cadence)
+- Normalizes them into measurable weekly commitments
+- Identifies risk moments where failure is statistically likely
+
+### Commitment Engine
+- Generates weekly savings targets
+- Creates spending ceilings
+- Defines behavioral constraints
+- Stores commitments as versioned, auditable objects
+
+### Behavioral Tracking
+- Accepts real spending data (manual entry, demo-seeded)
+- Aggregates behavior by week
+- Produces deviation and consistency metrics
+
+### Drift Detection
+Detects:
+- Overspending
+- Missed contributions
+- Pattern instability
+
+Classifies drift by type:
+- **Timing** — Spending happens at wrong times
+- **Volume** — Spending exceeds ceiling
+- **Consistency** — Irregular patterns
+
+### Intelligent Interventions
+Triggers context-aware interventions:
+- **Gentle warnings** — For low severity, first-time issues
+- **Recommitment prompts** — For medium severity, recurring issues
+- **Goal renegotiation** — For high severity, significant deviations
+
+Logs intervention timing, content, and outcome
+
+### Evaluation & Observability (First-Class Feature)
+Tracks:
+- Goal adherence rate
+- Intervention success rate
+- False-positive interventions
+
+Compares:
+- Prompt versions
+- Agent logic variants
+
+All agent behavior is logged and evaluated using Opik
+
+## System Architecture Overview
+
+Commitment Broker is implemented as a closed-loop agent system orchestrated with LangGraph, ensuring explicit state transitions and auditable decision paths.
+
+### Agent Workflow
+
+1. **Goal Structuring Agent** — Parses user input into structured format
+2. **Commitment Planning Agent** (Gemini Pro) — Generates weekly commitments
+3. **Behavioral Tracking** — Aggregates spending data by week
+4. **Drift Detection Agent** — Analyzes patterns for deviations
+5. **Intervention Agent** (Gemini Flash) — Generates contextual interventions
+6. **Evaluation Agent** — Tracks metrics and outcomes
+7. **Feedback loop** into future planning
+
+> Every loop improves the system's understanding of what actually works.
+
+## Technology Stack
 
 ### Backend
-- **FastAPI** - Python web framework
-- **PostgreSQL** - Database
-- **SQLAlchemy** - ORM
-- **LangGraph** - Agent orchestration
-- **Google Gemini API** - AI models (Pro for planning, Flash for interventions)
-- **Opik** - Observability and experiment tracking
+- **FastAPI** — API and orchestration layer
+- **PostgreSQL** — Durable behavioral data store
+- **SQLAlchemy** — ORM
+- **LangGraph** — Agent state machine
+- **Google Gemini API**
+  - `gemini-1.5-pro` for planning and reasoning
+  - `gemini-1.5-flash` for fast interventions
+- **Opik** — Observability, experiment tracking, evaluation
 
 ### Frontend
-- **Next.js 14** - React framework with App Router
-- **TypeScript** - Type safety
-- **TailwindCSS** - Styling
-- **shadcn/ui** - UI components
+- **Next.js 14** (App Router)
+- **TypeScript**
+- **TailwindCSS**
+- **shadcn/ui**
+
+### Infrastructure
+- **Docker & Docker Compose**
+- Local-first, Vercel-ready deployment
 
 ## Getting Started
 
@@ -137,41 +219,60 @@ commitment_broker/
 └── README.md
 ```
 
-## API Endpoints
+## Observability & Evaluation (Opik Integration)
 
-- `POST /api/goals` - Create a new goal and generate commitment plan
-- `GET /api/commitments/{id}` - Get commitment details
-- `POST /api/spending` - Add spending entry
-- `GET /api/commitments/{id}/drift` - Check for drift in spending behavior
-- `GET /api/commitments/{id}/interventions` - Get intervention history
-- `GET /api/commitments/{id}/evaluation` - Get evaluation metrics
-- `PATCH /api/interventions/{id}/outcome` - Update intervention outcome
+Commitment Broker treats evaluation as a product feature, not an afterthought.
 
-## Demo Scenario
+### Tracked Metrics
+- Weekly adherence rate
+- Intervention effectiveness
+- Behavioral recovery after failure
+- Agent decision consistency
 
-The seeded demo data includes:
-1. One user with goal: "Save $5000 in 6 months"
-2. Generated commitment: $208/week savings target, $150/week spending ceiling
-3. Spending pattern:
-   - Week 1-2: Compliant
-   - Week 3: Overspends by $50 (failure)
-   - Week 4: Back on track (improvement)
-4. One intervention triggered in Week 3 (gentle warning)
-5. Evaluation shows 75% adherence rate, 100% intervention success
+### Experiments Compare
+- Prompt versions
+- Agent logic strategies
+- Intervention timing policies
+
+### Judges Can Inspect
+- Agent traces
+- Evaluation dashboards
+- Before/after behavioral outcomes
+
+## API Overview
+
+- `POST /api/goals` — Create a new goal and generate commitment plan
+- `GET /api/commitments/{id}` — Get commitment details
+- `POST /api/spending` — Add spending entry
+- `GET /api/commitments/{id}/drift` — Check for drift in spending behavior
+- `GET /api/commitments/{id}/interventions` — Get intervention history
+- `GET /api/commitments/{id}/evaluation` — Get evaluation metrics
+- `PATCH /api/interventions/{id}/outcome` — Update intervention outcome
+
+## Demo Scenario (Judge-Oriented)
+
+The seeded demo illustrates a complete behavioral loop:
+
+**User goal:** Save $5,000 in 6 months
+
+**Commitment generated:**
+- $208 weekly savings target
+- $150 weekly discretionary spending ceiling
+
+**Observed behavior:**
+- Weeks 1–2: compliant
+- Week 3: overspend by $50 (detected drift)
+- Intervention triggered
+- Week 4: behavior corrected
+
+**Evaluation results:**
+- 75% adherence rate
+- 100% intervention success
+- Clear recovery after failure
+
+> This demo intentionally includes failure — because recovery is the real signal of success.
 
 View the demo at: `http://localhost:3000/commitments/{commitment_id}`
-
-## Architecture
-
-The system uses LangGraph to orchestrate a state machine workflow:
-
-1. **Goal Structuring Agent** - Parses user input into structured format
-2. **Planning Agent** - Generates weekly commitments (uses Gemini Pro)
-3. **Drift Detection Agent** - Analyzes spending patterns for deviations
-4. **Intervention Agent** - Generates contextual interventions (uses Gemini Flash)
-5. **Evaluation Agent** - Tracks metrics and outcomes
-
-All agent interactions are logged to Opik for observability and prompt version comparison.
 
 ## Development
 
