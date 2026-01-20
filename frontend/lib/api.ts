@@ -1,0 +1,124 @@
+import axios from "axios";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+export interface GoalInput {
+  goal_description: string;
+  target_amount: number;
+  timeframe: string;
+  income_frequency: string;
+  risk_moments?: string[];
+  user_id: string;
+}
+
+export interface Commitment {
+  id: number;
+  goal_id: string;
+  user_id: string;
+  weekly_target: number;
+  spending_ceiling: number;
+  goal_amount: number;
+  goal_timeframe_weeks: number;
+  income_frequency: string;
+  version: number;
+  created_at: string;
+}
+
+export interface SpendingInput {
+  commitment_id: number;
+  amount: number;
+  category?: string;
+  week_number: number;
+  description?: string;
+}
+
+export interface Spending {
+  id: number;
+  commitment_id: number;
+  amount: number;
+  category?: string;
+  week_number: number;
+  description?: string;
+  created_at: string;
+}
+
+export interface Drift {
+  has_drift: boolean;
+  drift_type?: string;
+  severity?: string;
+  description?: string;
+  deviation_amount?: number;
+}
+
+export interface Intervention {
+  id: number;
+  commitment_id: number;
+  type: "gentle_warning" | "recommitment_prompt" | "goal_renegotiation";
+  message: string;
+  drift_type?: string;
+  triggered_at: string;
+  outcome?: string;
+}
+
+export interface Evaluation {
+  id: number;
+  commitment_id: number;
+  adherence_rate: number;
+  intervention_success_rate?: number;
+  false_positive_interventions: number;
+  total_interventions: number;
+  weeks_tracked: number;
+  weeks_compliant: number;
+  timestamp: string;
+}
+
+export const apiClient = {
+  goals: {
+    create: async (input: GoalInput): Promise<Commitment> => {
+      const response = await api.post("/goals", input);
+      return response.data;
+    },
+  },
+  commitments: {
+    get: async (id: number): Promise<Commitment> => {
+      const response = await api.get(`/commitments/${id}`);
+      return response.data;
+    },
+    getSpending: async (id: number): Promise<Spending[]> => {
+      const response = await api.get(`/commitments/${id}/spending`);
+      return response.data;
+    },
+    getDrift: async (id: number): Promise<Drift> => {
+      const response = await api.get(`/commitments/${id}/drift`);
+      return response.data;
+    },
+    getInterventions: async (id: number): Promise<Intervention[]> => {
+      const response = await api.get(`/commitments/${id}/interventions`);
+      return response.data;
+    },
+    getEvaluation: async (id: number): Promise<Evaluation> => {
+      const response = await api.get(`/commitments/${id}/evaluation`);
+      return response.data;
+    },
+  },
+  spending: {
+    add: async (input: SpendingInput): Promise<Spending> => {
+      const response = await api.post("/spending", input);
+      return response.data;
+    },
+  },
+  interventions: {
+    updateOutcome: async (id: number, outcome: string): Promise<void> => {
+      await api.patch(`/interventions/${id}/outcome?outcome=${outcome}`);
+    },
+  },
+};
+
+export default apiClient;
