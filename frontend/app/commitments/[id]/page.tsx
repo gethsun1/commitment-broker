@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -25,11 +25,7 @@ export default function CommitmentPage() {
   const [drift, setDrift] = useState<Drift | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadData();
-  }, [commitmentId]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [commitmentData, spendingData, interventionsData, evaluationData, driftData] =
@@ -52,7 +48,11 @@ export default function CommitmentPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [commitmentId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleSpendingAdded = () => {
     loadData();
@@ -161,7 +161,7 @@ export default function CommitmentPage() {
                     label="Weeks Compliant"
                     value={evaluation.weeks_compliant}
                   />
-                  {evaluation.intervention_success_rate !== null && (
+                  {evaluation.intervention_success_rate !== null && evaluation.intervention_success_rate !== undefined && (
                     <MetricStat
                       label="Intervention Success"
                       value={`${evaluation.intervention_success_rate.toFixed(1)}%`}

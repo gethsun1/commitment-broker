@@ -76,8 +76,8 @@ const config = {
           "50%": { transform: "translateY(-20px) rotateX(5deg)" },
         },
         "pulse-glow": {
-          "0%, 100%": { opacity: 1, boxShadow: "0 0 20px hsl(var(--primary) / 0.4)" },
-          "50%": { opacity: 0.8, boxShadow: "0 0 40px hsl(var(--primary) / 0.6)" },
+          "0%, 100%": { opacity: "1", boxShadow: "0 0 20px hsl(var(--primary) / 0.4)" },
+          "50%": { opacity: "0.8", boxShadow: "0 0 40px hsl(var(--primary) / 0.6)" },
         },
         "rotate-3d": {
           "0%": { transform: "rotateY(0deg)" },

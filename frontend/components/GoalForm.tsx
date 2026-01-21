@@ -166,7 +166,7 @@ export function GoalForm() {
               placeholder="Add risk moments when spending is likely..."
             />
             <p className="text-xs text-muted-foreground">
-              Times when you're most likely to overspend
+              Times when you&apos;re most likely to overspend
             </p>
           </div>
 

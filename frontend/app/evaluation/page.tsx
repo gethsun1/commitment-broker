@@ -49,6 +49,7 @@ export default function EvaluationPage() {
                 </CardHeader>
                 <CardContent>
                   <MetricStat
+                    label=""
                     value="75.0%"
                     description="Based on 4 weeks tracked"
                   />
@@ -70,6 +71,7 @@ export default function EvaluationPage() {
                 </CardHeader>
                 <CardContent>
                   <MetricStat
+                    label=""
                     value="100%"
                     description="1 intervention, 1 success"
                   />
@@ -91,6 +93,7 @@ export default function EvaluationPage() {
                 </CardHeader>
                 <CardContent>
                   <MetricStat
+                    label=""
                     value="0%"
                     description="0 false positives detected"
                   />

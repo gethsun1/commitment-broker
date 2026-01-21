@@ -11,7 +11,14 @@ export function CommitmentLoop({ className }: CommitmentLoopProps) {
   const centerX = 200;
   const centerY = 200;
 
-  const nodes = [
+  const nodes: Array<{
+    cx: number;
+    cy: number;
+    label: string;
+    labelX?: number;
+    labelY?: number;
+    labelAnchor: "start" | "middle" | "end";
+  }> = [
     { cx: centerX, cy: centerY - circleRadius, label: "Plan", labelY: centerY - circleRadius - 20, labelAnchor: "middle" },
     { cx: centerX + circleRadius, cy: centerY, label: "Act", labelX: centerX + circleRadius + 20, labelY: centerY + 4, labelAnchor: "start" },
     { cx: centerX, cy: centerY + circleRadius, label: "Observe", labelY: centerY + circleRadius + 20, labelAnchor: "middle" },

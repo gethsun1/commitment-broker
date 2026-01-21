@@ -54,7 +54,7 @@ export default function Home() {
                   transition={{ duration: 0.8, delay: 0.4 }}
                   className="text-base text-muted-foreground leading-relaxed max-w-xl"
                 >
-                  An AI system that plans, observes, intervenes, and learns so your goals don't fade.
+                  An AI system that plans, observes, intervenes, and learns so your goals don&apos;t fade.
                 </motion.p>
               </div>
 
