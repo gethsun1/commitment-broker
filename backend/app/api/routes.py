@@ -177,9 +177,20 @@ async def get_evaluation(commitment_id: int, db: Session = Depends(get_db)):
 @router.post("/commitments/{commitment_id}/evaluate", response_model=EvaluationResponse)
 async def trigger_evaluation(commitment_id: int, db: Session = Depends(get_db)):
     """Manually trigger evaluation agent run to generate new AI-evaluated metrics."""
-    tracking = tracking_service if tracking_service else get_tracking_service()
-    evaluation = await tracking.evaluate_commitment(db, commitment_id)
-    return evaluation
+    try:
+        tracking = tracking_service if tracking_service else get_tracking_service()
+        evaluation = await tracking.evaluate_commitment(db, commitment_id)
+        return evaluation
+    except Exception as e:
+        # Log the error for debugging
+        import traceback
+        print(f"⚠️  Error in trigger_evaluation: {e}")
+        print(traceback.format_exc())
+        # Re-raise as HTTPException to ensure proper error response with CORS headers
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to run evaluation: {str(e)}"
+        )
 
 
 @router.get("/commitments/{commitment_id}/spending", response_model=List[SpendingResponse])
