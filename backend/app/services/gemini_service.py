@@ -8,14 +8,14 @@ from app.config import settings
 class GeminiService:
     def __init__(self):
         self.api_key = settings.gemini_api_key
-        # Use gemini-pro-latest (available model for v1beta API)
+        # Use gemini-2.5-flash for all operations (faster and more cost-effective)
         self.pro_model = ChatGoogleGenerativeAI(
-            model="gemini-pro-latest",
+            model="gemini-2.5-flash",
             google_api_key=self.api_key,
             temperature=0.7
         )
         self.flash_model = ChatGoogleGenerativeAI(
-            model="gemini-flash-latest",  # Use flash model for faster responses
+            model="gemini-2.5-flash",  # Use flash model for faster responses
             google_api_key=self.api_key,
             temperature=0.7
         )
@@ -247,7 +247,7 @@ Return a JSON object with:
         drift_events: list = None
     ) -> Dict[str, Any]:
         """
-        Evaluation Agent: AI-powered evaluation using Gemini Pro.
+        Evaluation Agent: AI-powered evaluation using Gemini 2.0 Flash.
         Produces structured JSON evaluation metrics including Behavioral Recovery Score.
         NO math-based calculations - all metrics come from AI analysis.
         """
