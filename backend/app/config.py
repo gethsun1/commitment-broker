@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     database_url: str = Field(default_factory=get_default_database_url)
     gemini_api_key: str = ""
     opik_api_key: Optional[str] = None
+    opik_workspace: Optional[str] = None
     backend_host: str = "0.0.0.0"
     backend_port: int = 8000
 

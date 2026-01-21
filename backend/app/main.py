@@ -7,11 +7,17 @@ from app.api.routes import router
 from app.config import settings
 
 # Configure Opik before app creation
+# Opik will use environment variables if available, or config file
+# See: https://www.comet.com/docs/opik/python-sdk-reference/configure
 if settings.opik_api_key:
-    opik.configure(api_key=settings.opik_api_key)
+    config_params = {"api_key": settings.opik_api_key}
+    if settings.opik_workspace:
+        config_params["workspace"] = settings.opik_workspace
+    opik.configure(**config_params)
 else:
-    # Configure without API key for local development
-    opik.configure(use_local=False)
+    # Try to configure from environment variables or config file
+    # This allows Opik to work if OPIK_API_KEY and OPIK_WORKSPACE are set in env
+    opik.configure()
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
