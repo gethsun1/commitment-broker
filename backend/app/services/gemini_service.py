@@ -1,7 +1,6 @@
 from typing import Optional, Dict, Any
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
-from opik.integrations.langchain import OpikTracer
 
 from app.config import settings
 
@@ -21,11 +20,43 @@ class GeminiService:
             google_api_key=self.api_key,
             temperature=0.7
         )
-        # Initialize OpikTracer for LLM call tracing
-        self.opik_tracer = OpikTracer(
-            project_name="commitment-broker",
-            tags=["langchain", "gemini"]
-        )
+
+    def _get_opik_tracer(self, agent_type: str, method: str):
+        """Get OpikTracer if Opik is configured, otherwise return None."""
+        try:
+            from opik.integrations.langchain import OpikTracer
+            import os
+            
+            # Check if Opik API key is set (basic check)
+            opik_api_key = os.getenv("OPIK_API_KEY")
+            if not opik_api_key:
+                # Try to check settings if available
+                try:
+                    from app.config import settings
+                    if not settings.opik_api_key:
+                        return None
+                except Exception:
+                    return None
+            
+            # Try to create tracer - if it fails, return None
+            try:
+                return OpikTracer(
+                    project_name="commitment-broker",
+                    tags=["langchain", "gemini", agent_type],
+                    metadata={"agent_type": agent_type, "method": method}
+                )
+            except Exception as tracer_error:
+                # OpikTracer creation failed (e.g., httpx version issue, not configured)
+                # Return None so LLM calls proceed without tracing
+                print(f"⚠️  Opik tracer creation failed for {agent_type}/{method}: {tracer_error}")
+                return None
+        except ImportError:
+            # Opik not installed, return None
+            return None
+        except Exception:
+            # If Opik is not available or fails, return None
+            # The LLM calls will proceed without tracing
+            return None
 
     def _parse_json_response(self, response: str) -> Dict[str, Any]:
         """Parse JSON from LLM response, handling markdown code blocks."""
@@ -74,16 +105,13 @@ Return a JSON object with:
             HumanMessage(content=prompt)
         ]
         
-        # Create tracer with agent-specific tags and metadata
-        tracer = OpikTracer(
-            project_name="commitment-broker",
-            tags=["langchain", "gemini", "goal_agent"],
-            metadata={"agent_type": "goal_agent", "method": "structure_goal"}
-        )
+        # Get Opik tracer if available
+        tracer = self._get_opik_tracer("goal_agent", "structure_goal")
+        callbacks = [tracer] if tracer else []
         
         response = await self.pro_model.ainvoke(
             messages,
-            config={"callbacks": [tracer]}
+            config={"callbacks": callbacks} if callbacks else {}
         )
         return self._parse_json_response(response.content)
 
@@ -114,7 +142,14 @@ Return a JSON object with:
             HumanMessage(content=prompt)
         ]
         
-        response = await self.pro_model.ainvoke(messages)
+        # Get Opik tracer if available
+        tracer = self._get_opik_tracer("planning_agent", "plan_commitment")
+        callbacks = [tracer] if tracer else []
+        
+        response = await self.pro_model.ainvoke(
+            messages,
+            config={"callbacks": callbacks} if callbacks else {}
+        )
         return self._parse_json_response(response.content)
 
     async def detect_drift(self, commitment_data: Dict[str, Any], spending_data: list) -> Dict[str, Any]:
@@ -153,16 +188,13 @@ Return a JSON object with:
             HumanMessage(content=prompt)
         ]
         
-        # Create tracer with agent-specific tags and metadata
-        tracer = OpikTracer(
-            project_name="commitment-broker",
-            tags=["langchain", "gemini", "drift_agent"],
-            metadata={"agent_type": "drift_agent", "method": "detect_drift"}
-        )
+        # Get Opik tracer if available
+        tracer = self._get_opik_tracer("drift_agent", "detect_drift")
+        callbacks = [tracer] if tracer else []
         
         response = await self.pro_model.ainvoke(
             messages,
-            config={"callbacks": [tracer]}
+            config={"callbacks": callbacks} if callbacks else {}
         )
         return self._parse_json_response(response.content)
 
@@ -198,16 +230,13 @@ Return a JSON object with:
             HumanMessage(content=prompt)
         ]
         
-        # Create tracer with agent-specific tags and metadata
-        tracer = OpikTracer(
-            project_name="commitment-broker",
-            tags=["langchain", "gemini", "intervention_agent"],
-            metadata={"agent_type": "intervention_agent", "method": "generate_intervention"}
-        )
+        # Get Opik tracer if available
+        tracer = self._get_opik_tracer("intervention_agent", "generate_intervention")
+        callbacks = [tracer] if tracer else []
         
         response = await self.flash_model.ainvoke(
             messages,
-            config={"callbacks": [tracer]}
+            config={"callbacks": callbacks} if callbacks else {}
         )
         return self._parse_json_response(response.content)
 

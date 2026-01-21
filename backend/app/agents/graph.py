@@ -1,7 +1,6 @@
-from typing import Dict, Any, TypedDict, Literal
+from typing import Dict, Any, TypedDict, Literal, Optional
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
-from opik.integrations.langchain import OpikTracer, track_langgraph
 
 from app.agents.goal_agent import structure_goal_node
 from app.agents.planning_agent import plan_commitment_node
@@ -37,13 +36,58 @@ class CommitmentGraph:
     
     def __init__(self):
         compiled_graph = self._build_graph()
-        # Wrap graph with Opik tracing for automatic workflow tracing
-        opik_tracer = OpikTracer(
-            project_name="commitment-broker",
-            tags=["langchain", "langgraph", "workflow"],
-            metadata={"workflow_type": "commitment_creation"}
-        )
-        self.graph = track_langgraph(compiled_graph, opik_tracer)
+        # Wrap graph with Opik tracing if available
+        self.graph = self._wrap_with_opik(compiled_graph, "commitment_creation")
+    
+    def _wrap_with_opik(self, compiled_graph, workflow_type: str):
+        """Wrap graph with Opik tracing if Opik is properly configured."""
+        try:
+            from opik.integrations.langchain import OpikTracer, track_langgraph
+            import opik
+            import os
+            
+            # Check if Opik API key is set (basic check)
+            # If not configured, return graph without tracing
+            opik_api_key = os.getenv("OPIK_API_KEY")
+            if not opik_api_key:
+                # Try to check settings if available
+                try:
+                    from app.config import settings
+                    if not settings.opik_api_key:
+                        return compiled_graph
+                except Exception:
+                    return compiled_graph
+            
+            # Try to create tracer - if it fails, we'll catch and return graph without tracing
+            # This catches httpx version issues, proxy errors, and other Opik initialization problems
+            try:
+                opik_tracer = OpikTracer(
+                    project_name="commitment-broker",
+                    tags=["langchain", "langgraph", "workflow"],
+                    metadata={"workflow_type": workflow_type}
+                )
+                return track_langgraph(compiled_graph, opik_tracer)
+            except (TypeError, AttributeError, ImportError) as tracer_error:
+                # OpikTracer creation failed due to version incompatibility (e.g., httpx proxy issue)
+                # Return graph without tracing - app will work but without Opik observability
+                error_msg = str(tracer_error)
+                if "proxy" in error_msg.lower() or "unexpected keyword" in error_msg.lower():
+                    print(f"⚠️  Opik httpx compatibility issue for {workflow_type}. Continuing without tracing.")
+                else:
+                    print(f"⚠️  Opik tracer creation failed for {workflow_type}: {tracer_error}")
+                return compiled_graph
+            except Exception as tracer_error:
+                # Any other OpikTracer creation error
+                print(f"⚠️  Opik tracer creation failed for {workflow_type}: {tracer_error}")
+                return compiled_graph
+        except ImportError:
+            # Opik not installed, return graph without tracing
+            return compiled_graph
+        except Exception as e:
+            # If Opik tracing fails for any reason, return graph without tracing
+            # This ensures the app can start even if Opik has issues
+            print(f"⚠️  Opik tracing unavailable for {workflow_type}: {e}")
+            return compiled_graph
     
     def _build_graph(self) -> StateGraph:
         """Build the LangGraph state machine for commitment creation."""
@@ -103,13 +147,8 @@ class CommitmentGraph:
         
         compiled_tracking = tracking_graph.compile()
         
-        # Wrap tracking graph with Opik tracing
-        tracking_tracer = OpikTracer(
-            project_name="commitment-broker",
-            tags=["langchain", "langgraph", "workflow"],
-            metadata={"workflow_type": "tracking_and_detection"}
-        )
-        compiled_tracking = track_langgraph(compiled_tracking, tracking_tracer)
+        # Wrap tracking graph with Opik tracing if available
+        compiled_tracking = self._wrap_with_opik(compiled_tracking, "tracking_and_detection")
         
         initial_state: CommitmentState = {
             "user_input": {},

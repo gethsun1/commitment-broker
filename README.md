@@ -394,7 +394,7 @@ The seeded demo illustrates a complete behavioral loop:
 
 > This demo intentionally includes failure — because recovery is the real signal of success.
 
-View the demo at: `http://localhost:3000/commitments/{commitment_id}`
+View the demo at: `https://commitmentbroker.vercel.app/`
 
 ## Development
 

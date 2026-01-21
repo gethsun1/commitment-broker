@@ -17,8 +17,35 @@ from app.services.tracking_service import TrackingService
 
 router = APIRouter()
 
-commitment_service = CommitmentService()
-tracking_service = TrackingService()
+# Initialize services lazily to avoid Opik initialization errors at import time
+# Services will be created on first use via dependency injection or lazy initialization
+_commitment_service = None
+_tracking_service = None
+
+def get_commitment_service():
+    """Get or create CommitmentService instance (lazy initialization)."""
+    global _commitment_service
+    if _commitment_service is None:
+        _commitment_service = CommitmentService()
+    return _commitment_service
+
+def get_tracking_service():
+    """Get or create TrackingService instance (lazy initialization)."""
+    global _tracking_service
+    if _tracking_service is None:
+        _tracking_service = TrackingService()
+    return _tracking_service
+
+# For backward compatibility, create instances but catch any initialization errors
+try:
+    commitment_service = CommitmentService()
+    tracking_service = TrackingService()
+except Exception as e:
+    print(f"⚠️  Service initialization warning: {e}")
+    print("   Services will be initialized on first use.")
+    # Set to None - will be created lazily
+    commitment_service = None
+    tracking_service = None
 
 
 @router.post("/goals", response_model=CommitmentResponse)
@@ -33,7 +60,8 @@ async def create_goal(goal_input: GoalInput, db: Session = Depends(get_db)):
         "risk_moments": goal_input.risk_moments or []
     }
     
-    commitment = await commitment_service.create_commitment(db, user_input)
+    service = commitment_service if commitment_service else get_commitment_service()
+    commitment = await service.create_commitment(db, user_input)
     return commitment
 
 
@@ -52,7 +80,10 @@ async def get_commitment(commitment_id: int, db: Session = Depends(get_db)):
 @router.post("/spending", response_model=SpendingResponse)
 async def add_spending(spending_input: SpendingInput, db: Session = Depends(get_db)):
     """Add spending entry and trigger drift detection if needed."""
-    spending = await tracking_service.add_spending(
+    tracking = tracking_service if tracking_service else get_tracking_service()
+    commitment = commitment_service if commitment_service else get_commitment_service()
+    
+    spending = await tracking.add_spending(
         db,
         spending_input.commitment_id,
         spending_input.amount,
@@ -62,14 +93,14 @@ async def add_spending(spending_input: SpendingInput, db: Session = Depends(get_
     )
     
     # Trigger drift detection
-    drift_result = await commitment_service.track_spending_and_detect_drift(
+    drift_result = await commitment.track_spending_and_detect_drift(
         db,
         spending_input.commitment_id
     )
     
     # If drift detected, trigger intervention
     if drift_result.get("should_intervene"):
-        await tracking_service.trigger_intervention(
+        await tracking.trigger_intervention(
             db,
             spending_input.commitment_id,
             drift_result["drift_analysis"]
@@ -81,7 +112,8 @@ async def add_spending(spending_input: SpendingInput, db: Session = Depends(get_
 @router.get("/commitments/{commitment_id}/drift", response_model=DriftResponse)
 async def check_drift(commitment_id: int, db: Session = Depends(get_db)):
     """Check for drift in spending behavior."""
-    drift_result = await commitment_service.track_spending_and_detect_drift(
+    service = commitment_service if commitment_service else get_commitment_service()
+    drift_result = await service.track_spending_and_detect_drift(
         db,
         commitment_id
     )
@@ -111,7 +143,8 @@ async def get_interventions(commitment_id: int, db: Session = Depends(get_db)):
 @router.get("/commitments/{commitment_id}/evaluation", response_model=EvaluationResponse)
 async def get_evaluation(commitment_id: int, db: Session = Depends(get_db)):
     """Get evaluation metrics for a commitment."""
-    evaluation = await tracking_service.evaluate_commitment(db, commitment_id)
+    tracking = tracking_service if tracking_service else get_tracking_service()
+    evaluation = await tracking.evaluate_commitment(db, commitment_id)
     return evaluation
 
 

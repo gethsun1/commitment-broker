@@ -10,8 +10,34 @@ from app.observability.opik_client import OpikClient
 
 class CommitmentService:
     def __init__(self):
-        self.graph = CommitmentGraph()
-        self.opik = OpikClient()
+        try:
+            self.graph = CommitmentGraph()
+        except Exception as e:
+            print(f"⚠️  CommitmentGraph initialization warning: {e}")
+            # Create a minimal graph without Opik tracing as fallback
+            try:
+                from app.agents.graph import CommitmentState
+                from langgraph.graph import StateGraph, END
+                from app.agents.goal_agent import structure_goal_node
+                from app.agents.planning_agent import plan_commitment_node
+                
+                workflow = StateGraph(CommitmentState)
+                workflow.add_node("structure_goal", structure_goal_node)
+                workflow.add_node("plan_commitment", plan_commitment_node)
+                workflow.set_entry_point("structure_goal")
+                workflow.add_edge("structure_goal", "plan_commitment")
+                workflow.add_edge("plan_commitment", END)
+                self.graph = workflow.compile()
+            except Exception as fallback_error:
+                print(f"⚠️  Fallback graph creation also failed: {fallback_error}")
+                # Last resort: try to create CommitmentGraph again (might work if Opik issue is transient)
+                self.graph = CommitmentGraph()
+        
+        try:
+            self.opik = OpikClient()
+        except Exception as e:
+            print(f"⚠️  OpikClient initialization warning: {e}")
+            self.opik = None
     
     async def create_commitment(self, db: Session, user_input: Dict[str, Any]) -> Commitment:
         """Create a new commitment using the agent workflow."""
@@ -21,17 +47,21 @@ class CommitmentService:
         structured_goal = result.get("structured_goal", {})
         commitment_plan = result.get("commitment_plan", {})
         
-        # Log to Opik
-        await self.opik.log_experiment(
-            experiment_name="commitment_creation",
-            prompt_version="v1",
-            agent_type="planning_agent",
-            metrics={
-                "goal_amount": structured_goal.get("target_amount"),
-                "timeframe_weeks": structured_goal.get("timeframe_weeks"),
-                "weekly_target": commitment_plan.get("weekly_target")
-            }
-        )
+        # Log to Opik if available
+        if self.opik:
+            try:
+                await self.opik.log_experiment(
+                    experiment_name="commitment_creation",
+                    prompt_version="v1",
+                    agent_type="planning_agent",
+                    metrics={
+                        "goal_amount": structured_goal.get("target_amount"),
+                        "timeframe_weeks": structured_goal.get("timeframe_weeks"),
+                        "weekly_target": commitment_plan.get("weekly_target")
+                    }
+                )
+            except Exception as e:
+                print(f"⚠️  Opik logging failed: {e}")
         
         # Create commitment in database
         goal_id = str(uuid.uuid4())
