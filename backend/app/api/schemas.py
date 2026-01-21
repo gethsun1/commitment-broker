@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from app.models.intervention import InterventionType
 
@@ -74,6 +74,7 @@ class InterventionResponse(BaseModel):
 class EvaluationResponse(BaseModel):
     id: int
     commitment_id: int
+    # Backward compatible fields (derived from snapshot)
     adherence_rate: float
     intervention_success_rate: Optional[float]
     false_positive_interventions: int
@@ -81,6 +82,18 @@ class EvaluationResponse(BaseModel):
     weeks_tracked: int
     weeks_compliant: int
     timestamp: datetime
+    # New AI-generated fields
+    evaluation_snapshot: Optional[Dict[str, Any]] = None  # Full JSON snapshot from Gemini
+    behavioral_recovery_score: Optional[int] = None  # 0-100 score
+    behavioral_recovery_interpretation: Optional[str] = None  # AI-generated explanation
+    adherence_trend: Optional[str] = None  # "improving", "declining", "stable"
+    adherence_confidence: Optional[float] = None  # 0.0-1.0 confidence score
+    intervention_justification: Optional[str] = None  # AI explanation for interventions
+    drift_classification_confidence: Optional[float] = None  # 0.0-1.0 confidence
+    planning_accuracy: Optional[float] = None  # 0.0-1.0 accuracy score
+    drift_detection_precision: Optional[float] = None  # 0.0-1.0 precision score
+    intervention_timing: Optional[str] = None  # "optimal", "early", "late"
+    average_deviation: Optional[float] = None  # Average deviation from target
 
     class Config:
         from_attributes = True

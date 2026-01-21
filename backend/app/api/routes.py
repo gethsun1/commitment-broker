@@ -142,7 +142,23 @@ async def get_interventions(commitment_id: int, db: Session = Depends(get_db)):
 
 @router.get("/commitments/{commitment_id}/evaluation", response_model=EvaluationResponse)
 async def get_evaluation(commitment_id: int, db: Session = Depends(get_db)):
-    """Get evaluation metrics for a commitment."""
+    """Get latest evaluation metrics for a commitment."""
+    from app.models.evaluation import Evaluation
+    
+    # Get the most recent evaluation
+    evaluation = db.query(Evaluation).filter(
+        Evaluation.commitment_id == commitment_id
+    ).order_by(Evaluation.timestamp.desc()).first()
+    
+    if not evaluation:
+        raise HTTPException(status_code=404, detail="No evaluation found for this commitment")
+    
+    return evaluation
+
+
+@router.post("/commitments/{commitment_id}/evaluate", response_model=EvaluationResponse)
+async def trigger_evaluation(commitment_id: int, db: Session = Depends(get_db)):
+    """Manually trigger evaluation agent run to generate new AI-evaluated metrics."""
     tracking = tracking_service if tracking_service else get_tracking_service()
     evaluation = await tracking.evaluate_commitment(db, commitment_id)
     return evaluation

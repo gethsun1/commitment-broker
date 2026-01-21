@@ -240,30 +240,174 @@ Return a JSON object with:
         )
         return self._parse_json_response(response.content)
 
-    async def evaluate_performance(self, commitment_data: Dict[str, Any], spending_data: list, interventions: list) -> Dict[str, Any]:
-        """Evaluation Agent: Calculate adherence and intervention metrics."""
-        total_weeks = len(set(s.get('week_number', 0) for s in spending_data))
-        compliant_weeks = sum(
-            1 for s in spending_data
-            if s.get('amount', 0) <= commitment_data.get('spending_ceiling', 0)
-        )
+    async def evaluate_performance(
+        self, 
+        commitment_data: Dict[str, Any], 
+        spending_data: list, 
+        interventions: list,
+        drift_events: list = None
+    ) -> Dict[str, Any]:
+        """
+        Evaluation Agent: AI-powered evaluation using Gemini Pro.
+        Produces structured JSON evaluation metrics including Behavioral Recovery Score.
+        NO math-based calculations - all metrics come from AI analysis.
+        """
+        # Aggregate spending by week for clearer analysis
+        weekly_spending = {}
+        for s in spending_data:
+            week = s.get('week_number', 0)
+            if week not in weekly_spending:
+                weekly_spending[week] = []
+            weekly_spending[week].append({
+                'amount': s.get('amount', 0),
+                'category': s.get('category', 'uncategorized'),
+                'description': s.get('description', '')
+            })
         
-        adherence_rate = (compliant_weeks / total_weeks * 100) if total_weeks > 0 else 0
+        # Format weekly summary
+        weekly_summary = []
+        for week in sorted(weekly_spending.keys()):
+            total_week_spending = sum(item['amount'] for item in weekly_spending[week])
+            weekly_summary.append({
+                'week': week,
+                'total_spending': total_week_spending,
+                'ceiling': commitment_data.get('spending_ceiling', 0),
+                'transactions': len(weekly_spending[week])
+            })
         
-        successful_interventions = sum(
-            1 for i in interventions
-            if i.get('outcome') == 'success'
-        )
-        intervention_success_rate = (
-            successful_interventions / len(interventions) * 100
-            if interventions else 0
-        )
+        # Format intervention history with recovery analysis
+        intervention_history = []
+        for i in interventions:
+            intervention_history.append({
+                'type': i.get('type', 'unknown'),
+                'drift_type': i.get('drift_type', 'unknown'),
+                'outcome': i.get('outcome', 'pending'),
+                'triggered_at': i.get('triggered_at', 'unknown'),
+                'message': i.get('message', '')[:100]  # Truncate for prompt
+            })
         
-        return {
-            "adherence_rate": round(adherence_rate, 2),
-            "intervention_success_rate": round(intervention_success_rate, 2),
-            "weeks_tracked": total_weeks,
-            "weeks_compliant": compliant_weeks,
-            "total_interventions": len(interventions),
-            "successful_interventions": successful_interventions
-        }
+        # Format drift events
+        drift_summary = []
+        if drift_events:
+            for d in drift_events:
+                drift_summary.append({
+                    'type': d.get('drift_type', 'unknown'),
+                    'severity': d.get('severity', 'unknown'),
+                    'week': d.get('week_number', 'unknown'),
+                    'deviation': d.get('deviation_amount', 0)
+                })
+        
+        prompt = f"""You are an AI Evaluation Agent for a financial commitment tracking system. Your task is to evaluate commitment performance, intervention effectiveness, and calculate a Behavioral Recovery Score.
+
+COMMITMENT CONTEXT:
+- Goal Amount: ${commitment_data.get('goal_amount', 0):.2f}
+- Weekly Target: ${commitment_data.get('weekly_target', 0):.2f}
+- Spending Ceiling: ${commitment_data.get('spending_ceiling', 0):.2f}
+- Timeframe: {commitment_data.get('goal_timeframe_weeks', 0)} weeks
+- Weeks Remaining: {commitment_data.get('weeks_remaining', 0)}
+
+WEEKLY SPENDING HISTORY:
+{chr(10).join([f"Week {w['week']}: ${w['total_spending']:.2f} spent (ceiling: ${w['ceiling']:.2f}) - {'COMPLIANT' if w['total_spending'] <= w['ceiling'] else 'EXCEEDED'}" for w in weekly_summary])}
+
+DRIFT DETECTION EVENTS:
+{chr(10).join([f"- {d['type']} drift (severity: {d['severity']}, week: {d['week']}, deviation: ${d['deviation']:.2f})" for d in drift_summary]) if drift_summary else "No drift events detected"}
+
+INTERVENTION HISTORY:
+{chr(10).join([f"- {i['type']} intervention (drift: {i['drift_type']}, outcome: {i['outcome']})" for i in intervention_history]) if intervention_history else "No interventions triggered"}
+
+YOUR TASK:
+1. Calculate adherence rate (percentage of weeks meeting spending ceiling) and identify trend
+2. Evaluate intervention success rate and false positive rate
+3. Analyze drift detection accuracy (volume, timing, consistency drifts)
+4. Assess agent performance (planning accuracy, drift detection precision, intervention timing)
+5. Calculate Behavioral Recovery Score (0-100) considering:
+   - Time to behavior correction after intervention
+   - Stability post-intervention (weeks of compliance after intervention)
+   - Need for escalation (did intervention require follow-up?)
+   - Overall trajectory improvement
+
+Return ONLY a valid JSON object matching this exact schema:
+{{
+  "adherence": {{
+    "rate": 0.74,
+    "trend": "improving",
+    "confidence": 0.88
+  }},
+  "interventions": {{
+    "success_rate": 0.92,
+    "false_positive_rate": 0.0,
+    "justification": "Intervention triggered after deviation exceeded historical tolerance"
+  }},
+  "drift_analysis": {{
+    "volume_drifts": 1,
+    "timing_drifts": 0,
+    "consistency_drifts": 0,
+    "classification_confidence": 0.94
+  }},
+  "agent_performance": {{
+    "planning_accuracy": 0.95,
+    "drift_detection_precision": 1.0,
+    "intervention_timing": "optimal"
+  }},
+  "behavioral_recovery_score": {{
+    "score": 87,
+    "interpretation": "Strong behavioral recovery after intervention",
+    "confidence": 0.91
+  }}
+}}
+
+IMPORTANT: Return ONLY the JSON object, no markdown, no explanations, no code blocks."""
+        
+        messages = [
+            SystemMessage(content="You are an expert evaluation agent for financial commitment systems. You analyze behavioral patterns, intervention effectiveness, and calculate recovery metrics. Always return valid JSON matching the required schema."),
+            HumanMessage(content=prompt)
+        ]
+        
+        # Get Opik tracer for evaluation agent
+        tracer = self._get_opik_tracer("evaluation_agent", "evaluate_performance")
+        callbacks = [tracer] if tracer else []
+        
+        try:
+            response = await self.pro_model.ainvoke(
+                messages,
+                config={"callbacks": callbacks} if callbacks else {}
+            )
+            
+            # Parse JSON response
+            evaluation_json = self._parse_json_response(response.content)
+            
+            # Validate structure and return
+            return evaluation_json
+            
+        except Exception as e:
+            # Log error but return a structured fallback
+            print(f"⚠️  Evaluation Agent error: {e}")
+            # Return minimal valid structure
+            return {
+                "adherence": {
+                    "rate": 0.0,
+                    "trend": "unknown",
+                    "confidence": 0.0
+                },
+                "interventions": {
+                    "success_rate": 0.0,
+                    "false_positive_rate": 0.0,
+                    "justification": f"Evaluation error: {str(e)}"
+                },
+                "drift_analysis": {
+                    "volume_drifts": 0,
+                    "timing_drifts": 0,
+                    "consistency_drifts": 0,
+                    "classification_confidence": 0.0
+                },
+                "agent_performance": {
+                    "planning_accuracy": 0.0,
+                    "drift_detection_precision": 0.0,
+                    "intervention_timing": "unknown"
+                },
+                "behavioral_recovery_score": {
+                    "score": 0,
+                    "interpretation": "Unable to calculate due to evaluation error",
+                    "confidence": 0.0
+                }
+            }

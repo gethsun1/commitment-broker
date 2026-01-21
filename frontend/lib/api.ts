@@ -70,6 +70,7 @@ export interface Intervention {
 export interface Evaluation {
   id: number;
   commitment_id: number;
+  // Backward compatible fields
   adherence_rate: number;
   intervention_success_rate?: number;
   false_positive_interventions: number;
@@ -77,6 +78,45 @@ export interface Evaluation {
   weeks_tracked: number;
   weeks_compliant: number;
   timestamp: string;
+  // New AI-generated fields
+  evaluation_snapshot?: {
+    adherence?: {
+      rate: number;
+      trend?: string;
+      confidence?: number;
+    };
+    interventions?: {
+      success_rate?: number;
+      false_positive_rate?: number;
+      justification?: string;
+    };
+    drift_analysis?: {
+      volume_drifts?: number;
+      timing_drifts?: number;
+      consistency_drifts?: number;
+      classification_confidence?: number;
+    };
+    agent_performance?: {
+      planning_accuracy?: number;
+      drift_detection_precision?: number;
+      intervention_timing?: string;
+    };
+    behavioral_recovery_score?: {
+      score: number;
+      interpretation?: string;
+      confidence?: number;
+    };
+  };
+  behavioral_recovery_score?: number;
+  behavioral_recovery_interpretation?: string;
+  adherence_trend?: string;
+  adherence_confidence?: number;
+  intervention_justification?: string;
+  drift_classification_confidence?: number;
+  planning_accuracy?: number;
+  drift_detection_precision?: number;
+  intervention_timing?: string;
+  average_deviation?: number;
 }
 
 export const apiClient = {
@@ -105,6 +145,10 @@ export const apiClient = {
     },
     getEvaluation: async (id: number): Promise<Evaluation> => {
       const response = await api.get(`/commitments/${id}/evaluation`);
+      return response.data;
+    },
+    triggerEvaluation: async (id: number): Promise<Evaluation> => {
+      const response = await api.post(`/commitments/${id}/evaluate`);
       return response.data;
     },
   },
