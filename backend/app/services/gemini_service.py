@@ -9,15 +9,18 @@ class GeminiService:
     def __init__(self):
         self.api_key = settings.gemini_api_key
         # Use gemini-2.5-flash for all operations (faster and more cost-effective)
+        # convert_system_message_to_human=True fixes SystemMessage compatibility issues
         self.pro_model = ChatGoogleGenerativeAI(
             model="gemini-2.5-flash",
             google_api_key=self.api_key,
-            temperature=0.7
+            temperature=0.7,
+            convert_system_message_to_human=True
         )
         self.flash_model = ChatGoogleGenerativeAI(
             model="gemini-2.5-flash",  # Use flash model for faster responses
             google_api_key=self.api_key,
-            temperature=0.7
+            temperature=0.7,
+            convert_system_message_to_human=True
         )
 
     def _get_opik_tracer(self, agent_type: str, method: str):
@@ -39,15 +42,16 @@ class GeminiService:
             
             # Try to create tracer - if it fails, return None
             try:
-                return OpikTracer(
+                tracer = OpikTracer(
                     project_name="commitment-broker",
                     tags=["langchain", "gemini", agent_type],
                     metadata={"agent_type": agent_type, "method": method}
                 )
+                return tracer
             except Exception as tracer_error:
                 # OpikTracer creation failed (e.g., httpx version issue, not configured)
                 # Return None so LLM calls proceed without tracing
-                print(f"⚠️  Opik tracer creation failed for {agent_type}/{method}: {tracer_error}")
+                # Don't print error - Opik issues are non-critical
                 return None
         except ImportError:
             # Opik not installed, return None
@@ -104,14 +108,21 @@ Return a JSON object with:
             HumanMessage(content=prompt)
         ]
         
-        # Get Opik tracer if available
+        # Get Opik tracer if available (silently fail if Opik has issues)
         tracer = self._get_opik_tracer("goal_agent", "structure_goal")
         callbacks = [tracer] if tracer else []
         
-        response = await self.pro_model.ainvoke(
-            messages,
-            config={"callbacks": callbacks} if callbacks else {}
-        )
+        try:
+            response = await self.pro_model.ainvoke(
+                messages,
+                config={"callbacks": callbacks} if callbacks else {}
+            )
+        except Exception as e:
+            # If Opik callback fails, retry without callbacks
+            if callbacks:
+                response = await self.pro_model.ainvoke(messages)
+            else:
+                raise
         return self._parse_json_response(response.content)
 
     async def plan_commitment(self, goal_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -187,14 +198,21 @@ Return a JSON object with:
             HumanMessage(content=prompt)
         ]
         
-        # Get Opik tracer if available
+        # Get Opik tracer if available (silently fail if Opik has issues)
         tracer = self._get_opik_tracer("drift_agent", "detect_drift")
         callbacks = [tracer] if tracer else []
         
-        response = await self.pro_model.ainvoke(
-            messages,
-            config={"callbacks": callbacks} if callbacks else {}
-        )
+        try:
+            response = await self.pro_model.ainvoke(
+                messages,
+                config={"callbacks": callbacks} if callbacks else {}
+            )
+        except Exception as e:
+            # If Opik callback fails, retry without callbacks
+            if callbacks:
+                response = await self.pro_model.ainvoke(messages)
+            else:
+                raise
         return self._parse_json_response(response.content)
 
     async def generate_intervention(self, drift_data: Dict[str, Any], commitment_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -362,15 +380,22 @@ IMPORTANT: Return ONLY the JSON object, no markdown, no explanations, no code bl
             HumanMessage(content=prompt)
         ]
         
-        # Get Opik tracer for evaluation agent
+        # Get Opik tracer for evaluation agent (silently fail if Opik has issues)
         tracer = self._get_opik_tracer("evaluation_agent", "evaluate_performance")
         callbacks = [tracer] if tracer else []
         
         try:
-            response = await self.pro_model.ainvoke(
-                messages,
-                config={"callbacks": callbacks} if callbacks else {}
-            )
+            try:
+                response = await self.pro_model.ainvoke(
+                    messages,
+                    config={"callbacks": callbacks} if callbacks else {}
+                )
+            except Exception as callback_error:
+                # If Opik callback fails, retry without callbacks
+                if callbacks and ("SystemMessage" in str(callback_error) or "Opik" in str(callback_error) or "model_dump" in str(callback_error)):
+                    response = await self.pro_model.ainvoke(messages)
+                else:
+                    raise
             
             # Parse JSON response
             evaluation_json = self._parse_json_response(response.content)
@@ -380,7 +405,9 @@ IMPORTANT: Return ONLY the JSON object, no markdown, no explanations, no code bl
             
         except Exception as e:
             # Log error but return a structured fallback
-            print(f"⚠️  Evaluation Agent error: {e}")
+            # Only log non-Opik errors to avoid noise
+            if "Opik" not in str(e) and "SystemMessage" not in str(e) and "model_dump" not in str(e):
+                print(f"⚠️  Evaluation Agent error: {e}")
             # Return minimal valid structure
             return {
                 "adherence": {
