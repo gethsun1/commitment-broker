@@ -8,15 +8,14 @@ from app.config import settings
 class GeminiService:
     def __init__(self):
         self.api_key = settings.gemini_api_key
-        # Use gemini-pro (stable model name that works with v1beta API)
-        # gemini-1.5-pro requires v1 API which may not be available
+        # Use gemini-pro-latest (available model for v1beta API)
         self.pro_model = ChatGoogleGenerativeAI(
-            model="gemini-pro",
+            model="gemini-pro-latest",
             google_api_key=self.api_key,
             temperature=0.7
         )
         self.flash_model = ChatGoogleGenerativeAI(
-            model="gemini-pro",  # Use same model for now, can switch when API is updated
+            model="gemini-flash-latest",  # Use flash model for faster responses
             google_api_key=self.api_key,
             temperature=0.7
         )

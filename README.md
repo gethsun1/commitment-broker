@@ -565,11 +565,19 @@ npm test
 
 ### Database Migrations
 
+**For new evaluation fields (AI Evaluation Agent):**
 ```bash
 cd backend
-alembic revision --autogenerate -m "Description"
-alembic upgrade head
+python run_migration.py
 ```
+
+This adds the new columns for AI-generated evaluation metrics including:
+- `evaluation_snapshot` (JSON)
+- `behavioral_recovery_score` (INTEGER)
+- `behavioral_recovery_interpretation` (TEXT)
+- And other AI-evaluated metrics
+
+**Note:** The project uses SQLAlchemy's `Base.metadata.create_all()` for initial table creation. For schema changes, run the migration script above or use Alembic if configured.
 
 ## License
 

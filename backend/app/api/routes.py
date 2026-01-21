@@ -65,6 +65,15 @@ async def create_goal(goal_input: GoalInput, db: Session = Depends(get_db)):
     return commitment
 
 
+@router.get("/commitments", response_model=List[CommitmentResponse])
+async def list_commitments(db: Session = Depends(get_db)):
+    """Get all commitments."""
+    from app.models.commitment import Commitment
+    
+    commitments = db.query(Commitment).order_by(Commitment.created_at.desc()).all()
+    return commitments
+
+
 @router.get("/commitments/{commitment_id}", response_model=CommitmentResponse)
 async def get_commitment(commitment_id: int, db: Session = Depends(get_db)):
     """Get commitment details by ID."""
@@ -144,6 +153,12 @@ async def get_interventions(commitment_id: int, db: Session = Depends(get_db)):
 async def get_evaluation(commitment_id: int, db: Session = Depends(get_db)):
     """Get latest evaluation metrics for a commitment."""
     from app.models.evaluation import Evaluation
+    from app.models.commitment import Commitment
+    
+    # Verify commitment exists
+    commitment = db.query(Commitment).filter(Commitment.id == commitment_id).first()
+    if not commitment:
+        raise HTTPException(status_code=404, detail="Commitment not found")
     
     # Get the most recent evaluation
     evaluation = db.query(Evaluation).filter(
@@ -151,7 +166,10 @@ async def get_evaluation(commitment_id: int, db: Session = Depends(get_db)):
     ).order_by(Evaluation.timestamp.desc()).first()
     
     if not evaluation:
-        raise HTTPException(status_code=404, detail="No evaluation found for this commitment")
+        raise HTTPException(
+            status_code=404, 
+            detail="No evaluation found for this commitment. Use POST /api/commitments/{id}/evaluate to run evaluation."
+        )
     
     return evaluation
 

@@ -127,6 +127,10 @@ export const apiClient = {
     },
   },
   commitments: {
+    list: async (): Promise<Commitment[]> => {
+      const response = await api.get("/commitments");
+      return response.data;
+    },
     get: async (id: number): Promise<Commitment> => {
       const response = await api.get(`/commitments/${id}`);
       return response.data;
