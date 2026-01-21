@@ -70,3 +70,4 @@ alembic/versions/*.pyc
 
 # Opik
 .opik/
+.vercel

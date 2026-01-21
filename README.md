@@ -223,23 +223,143 @@ commitment_broker/
 
 ## Observability & Evaluation (Opik Integration)
 
-Commitment Broker treats evaluation as a product feature, not an afterthought.
+Commitment Broker treats evaluation as a product feature, not an afterthought. The system uses [Opik](https://www.comet.com/opik) for comprehensive LLM observability, tracing all agent interactions, and tracking experiment performance.
+
+### Opik Integration Overview
+
+Opik is integrated at multiple levels to provide complete visibility into the AI system:
+
+1. **LLM Call Tracing** - All Gemini API calls are automatically traced with OpikTracer
+2. **LangGraph Workflow Tracing** - Complete workflow executions are tracked
+3. **Experiment Tracking** - Custom metrics and intervention outcomes are logged
+
+### What's Being Traced
+
+#### LLM Agent Calls
+All four LLM-powered agents are automatically traced:
+
+- **Goal Structuring Agent** (`structure_goal`)
+  - Tags: `langchain`, `gemini`, `goal_agent`
+  - Captures: User input parsing, structured goal generation
+
+- **Commitment Planning Agent** (`plan_commitment`)
+  - Tags: `langchain`, `gemini`, `planning_agent`
+  - Captures: Weekly target calculation, spending ceiling generation
+
+- **Drift Detection Agent** (`detect_drift`)
+  - Tags: `langchain`, `gemini`, `drift_agent`
+  - Captures: Spending pattern analysis, drift classification
+
+- **Intervention Agent** (`generate_intervention`)
+  - Tags: `langchain`, `gemini`, `intervention_agent`
+  - Captures: Contextual intervention message generation
+
+#### LangGraph Workflows
+Complete workflow executions are traced:
+- **Commitment Creation Workflow** - Full goal-to-commitment pipeline
+- **Tracking & Detection Workflow** - Drift detection and intervention flow
+
+#### Automatic Metrics Captured
+- **Input/Output** - Complete prompts and responses
+- **Cost Tracking** - Token usage and API costs for Gemini calls
+- **Latency** - Response times for each LLM call
+- **Errors** - Any failures or exceptions during execution
+- **Metadata** - Agent type, method names, workflow context
+
+### Configuration
+
+Opik is configured in `backend/app/main.py` and automatically initializes on application startup:
+
+```python
+import opik
+from app.config import settings
+
+# Configure Opik before app creation
+if settings.opik_api_key:
+    opik.configure(api_key=settings.opik_api_key)
+```
+
+### Environment Setup
+
+Add your Opik API key to `.env`:
+
+```bash
+OPIK_API_KEY=your_opik_api_key_here
+```
+
+Get your API key from: https://comet.com/opik/your-workspace-name/get-started
+
+### Viewing Traces
+
+1. **Opik Dashboard** - Access your workspace dashboard to view all traces
+2. **Filter by Tags** - Use tags like `goal_agent`, `planning_agent` to filter traces
+3. **Workflow Visualization** - See complete LangGraph execution paths
+4. **Cost Analysis** - Track spending across all LLM calls
+5. **Performance Metrics** - Analyze latency and token usage patterns
 
 ### Tracked Metrics
 - Weekly adherence rate
 - Intervention effectiveness
 - Behavioral recovery after failure
 - Agent decision consistency
+- LLM call costs and token usage
+- Workflow execution times
 
 ### Experiments Compare
 - Prompt versions
 - Agent logic strategies
 - Intervention timing policies
+- Model performance (Pro vs Flash)
 
 ### Inspect
-- Agent traces
+- Agent traces with full input/output
 - Evaluation dashboards
 - Before/after behavioral outcomes
+- Cost and performance analytics
+- Workflow execution graphs
+
+### Implementation Details
+
+#### GeminiService Integration
+Located in `backend/app/services/gemini_service.py`:
+
+```python
+from opik.integrations.langchain import OpikTracer
+
+# Each LLM method includes OpikTracer
+tracer = OpikTracer(
+    project_name="commitment-broker",
+    tags=["langchain", "gemini", "goal_agent"],
+    metadata={"agent_type": "goal_agent", "method": "structure_goal"}
+)
+
+response = await self.pro_model.ainvoke(
+    messages,
+    config={"callbacks": [tracer]}
+)
+```
+
+#### LangGraph Integration
+Located in `backend/app/agents/graph.py`:
+
+```python
+from opik.integrations.langchain import OpikTracer, track_langgraph
+
+# Wrap compiled graphs for automatic tracing
+opik_tracer = OpikTracer(
+    project_name="commitment-broker",
+    tags=["langchain", "langgraph", "workflow"]
+)
+self.graph = track_langgraph(compiled_graph, opik_tracer)
+```
+
+### Benefits
+
+- **Complete Visibility** - See every LLM interaction in your system
+- **Cost Tracking** - Monitor and optimize API spending
+- **Performance Optimization** - Identify slow or inefficient calls
+- **Debugging** - Trace issues through complete execution paths
+- **Experiment Tracking** - Compare different prompt versions and strategies
 
 ## API Overview
 

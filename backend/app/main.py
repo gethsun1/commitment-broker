@@ -1,8 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import opik
 
 from app.database import engine, Base
 from app.api.routes import router
+from app.config import settings
+
+# Configure Opik before app creation
+if settings.opik_api_key:
+    opik.configure(api_key=settings.opik_api_key)
 
 # Create database tables
 Base.metadata.create_all(bind=engine)

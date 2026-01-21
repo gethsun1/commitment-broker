@@ -1,6 +1,7 @@
 from typing import Dict, Any, TypedDict, Literal
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
+from opik.integrations.langchain import OpikTracer, track_langgraph
 
 from app.agents.goal_agent import structure_goal_node
 from app.agents.planning_agent import plan_commitment_node
@@ -35,7 +36,14 @@ class CommitmentGraph:
     """LangGraph state machine for commitment broker workflow."""
     
     def __init__(self):
-        self.graph = self._build_graph()
+        compiled_graph = self._build_graph()
+        # Wrap graph with Opik tracing for automatic workflow tracing
+        opik_tracer = OpikTracer(
+            project_name="commitment-broker",
+            tags=["langchain", "langgraph", "workflow"],
+            metadata={"workflow_type": "commitment_creation"}
+        )
+        self.graph = track_langgraph(compiled_graph, opik_tracer)
     
     def _build_graph(self) -> StateGraph:
         """Build the LangGraph state machine."""
@@ -110,6 +118,14 @@ class CommitmentGraph:
         tracking_graph.add_edge("evaluate", END)
         
         compiled_tracking = tracking_graph.compile()
+        
+        # Wrap tracking graph with Opik tracing
+        tracking_tracer = OpikTracer(
+            project_name="commitment-broker",
+            tags=["langchain", "langgraph", "workflow"],
+            metadata={"workflow_type": "tracking_and_detection"}
+        )
+        compiled_tracking = track_langgraph(compiled_tracking, tracking_tracer)
         
         initial_state: CommitmentState = {
             "user_input": {},

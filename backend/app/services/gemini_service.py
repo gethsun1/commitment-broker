@@ -1,6 +1,7 @@
 from typing import Optional, Dict, Any
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
+from opik.integrations.langchain import OpikTracer
 
 from app.config import settings
 
@@ -19,6 +20,11 @@ class GeminiService:
             model="gemini-pro",  # Use same model for now, can switch when API is updated
             google_api_key=self.api_key,
             temperature=0.7
+        )
+        # Initialize OpikTracer for LLM call tracing
+        self.opik_tracer = OpikTracer(
+            project_name="commitment-broker",
+            tags=["langchain", "gemini"]
         )
 
     def _parse_json_response(self, response: str) -> Dict[str, Any]:
@@ -68,7 +74,17 @@ Return a JSON object with:
             HumanMessage(content=prompt)
         ]
         
-        response = await self.pro_model.ainvoke(messages)
+        # Create tracer with agent-specific tags and metadata
+        tracer = OpikTracer(
+            project_name="commitment-broker",
+            tags=["langchain", "gemini", "goal_agent"],
+            metadata={"agent_type": "goal_agent", "method": "structure_goal"}
+        )
+        
+        response = await self.pro_model.ainvoke(
+            messages,
+            config={"callbacks": [tracer]}
+        )
         return self._parse_json_response(response.content)
 
     async def plan_commitment(self, goal_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -137,7 +153,17 @@ Return a JSON object with:
             HumanMessage(content=prompt)
         ]
         
-        response = await self.pro_model.ainvoke(messages)
+        # Create tracer with agent-specific tags and metadata
+        tracer = OpikTracer(
+            project_name="commitment-broker",
+            tags=["langchain", "gemini", "drift_agent"],
+            metadata={"agent_type": "drift_agent", "method": "detect_drift"}
+        )
+        
+        response = await self.pro_model.ainvoke(
+            messages,
+            config={"callbacks": [tracer]}
+        )
         return self._parse_json_response(response.content)
 
     async def generate_intervention(self, drift_data: Dict[str, Any], commitment_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -172,7 +198,17 @@ Return a JSON object with:
             HumanMessage(content=prompt)
         ]
         
-        response = await self.flash_model.ainvoke(messages)
+        # Create tracer with agent-specific tags and metadata
+        tracer = OpikTracer(
+            project_name="commitment-broker",
+            tags=["langchain", "gemini", "intervention_agent"],
+            metadata={"agent_type": "intervention_agent", "method": "generate_intervention"}
+        )
+        
+        response = await self.flash_model.ainvoke(
+            messages,
+            config={"callbacks": [tracer]}
+        )
         return self._parse_json_response(response.content)
 
     async def evaluate_performance(self, commitment_data: Dict[str, Any], spending_data: list, interventions: list) -> Dict[str, Any]:
