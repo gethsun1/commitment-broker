@@ -193,6 +193,50 @@ async def trigger_evaluation(commitment_id: int, db: Session = Depends(get_db)):
         )
 
 
+@router.post("/admin/migrate", tags=["admin"])
+async def run_migration(db: Session = Depends(get_db)):
+    """
+    Manually trigger database migration.
+    Safe to run multiple times (idempotent).
+    This endpoint can be called from Render without shell access.
+    """
+    from app.database_migrations import run_evaluation_fields_migration, check_migration_status
+    
+    # Check current status
+    status = check_migration_status()
+    
+    if status.get("migrated"):
+        return {
+            "status": "already_migrated",
+            "message": "Migration already applied. No action needed.",
+            "details": status
+        }
+    
+    # Run migration
+    success = run_evaluation_fields_migration()
+    
+    if success:
+        return {
+            "status": "success",
+            "message": "Migration completed successfully",
+            "details": check_migration_status()
+        }
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail="Migration failed. Check server logs for details."
+        )
+
+
+@router.get("/admin/migration-status", tags=["admin"])
+async def get_migration_status():
+    """
+    Check the status of database migrations.
+    """
+    from app.database_migrations import check_migration_status
+    return check_migration_status()
+
+
 @router.get("/commitments/{commitment_id}/spending", response_model=List[SpendingResponse])
 async def get_spending(commitment_id: int, db: Session = Depends(get_db)):
     """Get spending history for a commitment."""
