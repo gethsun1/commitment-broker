@@ -62,13 +62,26 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Build allowed origins list
+allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",  # Alternative port
+    "https://commitmentbroker.vercel.app",  # Vercel production
+]
+
+# Add environment variable origins if provided
+if settings.allowed_origins:
+    allowed_origins.extend([origin.strip() for origin in settings.allowed_origins.split(",")])
+
+# Vercel preview deployments use pattern: https://*-*.vercel.app
+# Use regex to allow all Vercel preview deployments
+vercel_preview_regex = r"https://.*\.vercel\.app"
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3001",  # Alternative port
-    ],
+    allow_origins=allowed_origins,
+    allow_origin_regex=vercel_preview_regex,  # Allow all Vercel preview deployments
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

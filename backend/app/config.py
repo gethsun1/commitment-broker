@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     opik_workspace: Optional[str] = None
     backend_host: str = "0.0.0.0"
     backend_port: int = 8000
+    allowed_origins: Optional[str] = None  # Comma-separated list of allowed origins
 
     @model_validator(mode="before")
     @classmethod
