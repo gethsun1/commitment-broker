@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { MetricStat } from "@/components/MetricStat";
 import { apiClient, Evaluation, Intervention, Commitment } from "@/lib/api";
 import Link from "next/link";
 
-export default function EvaluationPage() {
+function EvaluationPageContent() {
   const searchParams = useSearchParams();
   const commitmentId = searchParams?.get("commitment_id") 
     ? parseInt(searchParams.get("commitment_id") as string) 
@@ -587,5 +587,20 @@ export default function EvaluationPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function EvaluationPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background py-12">
+        <div className="container mx-auto px-4 max-w-6xl text-center">
+          <h1 className="text-page-title mb-4">Evaluation Dashboard</h1>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    }>
+      <EvaluationPageContent />
+    </Suspense>
   );
 }
