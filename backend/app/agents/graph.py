@@ -46,35 +46,19 @@ class CommitmentGraph:
         self.graph = track_langgraph(compiled_graph, opik_tracer)
     
     def _build_graph(self) -> StateGraph:
-        """Build the LangGraph state machine."""
+        """Build the LangGraph state machine for commitment creation."""
         workflow = StateGraph(CommitmentState)
         
-        # Add nodes
+        # Add nodes for commitment creation workflow
         workflow.add_node("structure_goal", structure_goal_node)
         workflow.add_node("plan_commitment", plan_commitment_node)
-        workflow.add_node("detect_drift", detect_drift_node)
-        workflow.add_node("intervene", intervene_node)
-        workflow.add_node("evaluate", evaluate_node)
         
         # Set entry point
         workflow.set_entry_point("structure_goal")
         
-        # Add edges
+        # Add edges - simple linear flow for commitment creation
         workflow.add_edge("structure_goal", "plan_commitment")
-        workflow.add_edge("plan_commitment", END)  # Initial planning ends here
-        
-        # For tracking/evaluation flow
-        workflow.add_edge("detect_drift", "intervene")  # Will be conditional in practice
-        workflow.add_conditional_edges(
-            "detect_drift",
-            should_intervene,
-            {
-                "intervene": "intervene",
-                "evaluate": "evaluate"
-            }
-        )
-        workflow.add_edge("intervene", "evaluate")
-        workflow.add_edge("evaluate", END)
+        workflow.add_edge("plan_commitment", END)
         
         return workflow.compile()
     
