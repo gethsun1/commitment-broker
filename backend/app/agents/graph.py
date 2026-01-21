@@ -9,7 +9,7 @@ from app.agents.intervention_agent import intervene_node
 from app.agents.evaluation_agent import evaluate_node
 
 
-class CommitmentState(TypedDict):
+class CommitmentState(TypedDict, total=False):
     """Shared state for the commitment broker workflow."""
     user_input: Dict[str, Any]
     structured_goal: Dict[str, Any]
@@ -20,6 +20,7 @@ class CommitmentState(TypedDict):
     intervention: Dict[str, Any]
     evaluation: Dict[str, Any]
     interventions: list
+    drift_events: list  # Optional field for drift event history
     status: str
 
 
