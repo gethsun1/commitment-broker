@@ -10,10 +10,20 @@ from app.api.schemas import (
     SpendingResponse,
     DriftResponse,
     InterventionResponse,
-    EvaluationResponse
+    EvaluationResponse,
+    EscrowInitRequest,
+    EscrowInitResponse,
+    EscrowConfirmRequest,
+    EscrowStatusResponse,
 )
 from app.services.commitment_service import CommitmentService
 from app.services.tracking_service import TrackingService
+from app.services.escrow_service import (
+    generate_escrow_metadata,
+    confirm_deposit,
+    get_escrow_status,
+    mark_withdrawn,
+)
 
 router = APIRouter()
 
@@ -200,22 +210,23 @@ async def run_migration(db: Session = Depends(get_db)):
     Safe to run multiple times (idempotent).
     This endpoint can be called from Render without shell access.
     """
-    from app.database_migrations import run_evaluation_fields_migration, check_migration_status
+    from app.database_migrations import run_evaluation_fields_migration, run_escrow_migration, check_migration_status
     
     # Check current status
     status = check_migration_status()
     
     if status.get("migrated"):
+        run_escrow_migration()
         return {
             "status": "already_migrated",
             "message": "Migration already applied. No action needed.",
             "details": status
         }
     
-    # Run migration
+    # Run migrations
     success = run_evaluation_fields_migration()
-    
     if success:
+        run_escrow_migration()
         return {
             "status": "success",
             "message": "Migration completed successfully",
@@ -279,3 +290,73 @@ async def update_intervention_outcome(
     )
     
     return {"status": "updated", "intervention_id": intervention_id, "outcome": outcome}
+
+
+# Escrow (on-chain commitment, optional)
+
+
+@router.post("/escrow/init", response_model=EscrowInitResponse)
+async def escrow_init(body: EscrowInitRequest, db: Session = Depends(get_db)):
+    """Generate escrow metadata for frontend (commitment hash, unlock ts, contract, chain)."""
+    try:
+        meta = generate_escrow_metadata(db, body.commitment_id)
+        return EscrowInitResponse(
+            commitment_id=meta["commitment_id"],
+            unlock_timestamp=meta["unlock_timestamp"],
+            contract_address=meta["contract_address"],
+            chain_id=meta["chain_id"],
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/escrow/confirm")
+async def escrow_confirm(body: EscrowConfirmRequest, db: Session = Depends(get_db)):
+    """Save on-chain tx after wallet interaction (createCommitment)."""
+    try:
+        row = confirm_deposit(
+            db,
+            body.commitment_id,
+            body.wallet_address,
+            body.tx_hash,
+            body.amount,
+        )
+        from app.observability.opik_client import OpikClient
+        opik = OpikClient()
+        if opik.api_key:
+            try:
+                await opik.log_experiment(
+                    experiment_name="escrow_creation",
+                    prompt_version="v1",
+                    agent_type="escrow",
+                    metrics={"commitment_id": body.commitment_id, "amount_wei": body.amount},
+                    metadata={"wallet": body.wallet_address[:10] + "…"},
+                )
+            except Exception:
+                pass
+        return {
+            "status": "confirmed",
+            "escrow_id": row.id,
+            "commitment_id": body.commitment_id,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/escrow/{commitment_id}", response_model=EscrowStatusResponse)
+async def escrow_get(commitment_id: int, db: Session = Depends(get_db)):
+    """Fetch escrow status for frontend and evaluation agent."""
+    status = get_escrow_status(db, commitment_id)
+    if not status:
+        raise HTTPException(status_code=404, detail="Escrow not found for this commitment")
+    return EscrowStatusResponse(**status)
+
+
+@router.patch("/escrow/{commitment_id}/withdrawn")
+async def escrow_mark_withdrawn(commitment_id: int, db: Session = Depends(get_db)):
+    """Mark escrow as withdrawn after user calls contract withdraw."""
+    try:
+        mark_withdrawn(db, commitment_id)
+        return {"status": "withdrawn", "commitment_id": commitment_id}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

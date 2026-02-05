@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Navigation } from "@/components/Navigation";
+import { WalletProviders } from "@/components/WalletProviders";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,8 +23,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={inter.className}>
-        <Navigation />
-        {children}
+        <WalletProviders>
+          <Navigation />
+          {children}
+        </WalletProviders>
       </body>
     </html>
   );

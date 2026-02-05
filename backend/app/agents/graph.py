@@ -21,6 +21,7 @@ class CommitmentState(TypedDict, total=False):
     evaluation: Dict[str, Any]
     interventions: list
     drift_events: list  # Optional field for drift event history
+    escrow_data: Dict[str, Any]  # Optional; on-chain escrow status for evaluation
     status: str
 
 

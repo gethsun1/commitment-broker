@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     backend_host: str = "0.0.0.0"
     backend_port: int = 8000
     allowed_origins: Optional[str] = None  # Comma-separated list of allowed origins
+    escrow_contract_address: Optional[str] = None
+    chain_id: int = 11155111  # Ethereum Sepolia
+    private_key: Optional[str] = None
+    etherscan_api_key: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod
@@ -54,6 +58,7 @@ class Settings(BaseSettings):
         env_file = find_env_file()
         case_sensitive = False
         env_file_encoding = "utf-8"
+        extra = "ignore"
 
 
 settings = Settings()

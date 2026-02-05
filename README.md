@@ -89,6 +89,28 @@ Commitment Events → Evaluation Agent (Gemini Pro) → Structured JSON → Pers
 
 All agent behavior is logged and evaluated using Opik
 
+### On-Chain Escrow (Ethereum Sepolia)
+
+**Optional** on-chain enforcement: lock ETH until maturity. No penalties, no yield, no admin control. One chain only: **Ethereum Sepolia**.
+
+**User flow:**
+1. Create a commitment (existing flow).
+2. On the commitment detail page, enable **"Enable On-Chain Enforcement (Optional)"**.
+3. Connect wallet (RainbowKit), switch to Sepolia.
+4. Lock funds (default amount suggestion: weekly × duration; enter ETH to lock).
+5. Funds unlock after maturity; only the depositor may withdraw.
+
+**Setup:**
+- **Contracts:** `cd contracts`, `npm install`, `npx hardhat compile`. Deploy: `npx hardhat run scripts/deploy.js --network sepolia` (set `SEPOLIA_RPC_URL`, `PRIVATE_KEY` in `.env`).
+- **Env:** `ESCROW_CONTRACT_ADDRESS` (deployed contract), `CHAIN_ID=11155111`. Frontend: `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` (WalletConnect Cloud) optional.
+- **Artifacts:** Deploy script writes ABI + address to `frontend/lib/contracts/CommitmentEscrow.json`. Overwrite with your deployment output if you deploy manually.
+
+**APIs:** `POST /api/escrow/init`, `POST /api/escrow/confirm`, `GET /api/escrow/{commitment_id}`, `PATCH /api/escrow/{commitment_id}/withdrawn`.
+
+**UI:** Connect Wallet (nav), Escrow opt-in card and status badge (Locked / Unlocked / Withdrawn) on commitment detail. Disclaimer: *"This is not investment advice. Funds are time-locked for savings discipline."*
+
+**Evaluation:** Escrow-aware Behavioral Recovery Score and escrow metrics (follow-through rate, time-to-withdrawal, drift reduction during lock) are included when escrow is used. Opik traces are tagged with `escrow_enabled: true|false`.
+
 ## System Architecture Overview
 
 Commitment Broker is implemented as a closed-loop agent system orchestrated with LangGraph, ensuring explicit state transitions and auditable decision paths.
@@ -113,8 +135,7 @@ Commitment Broker is implemented as a closed-loop agent system orchestrated with
 - **SQLAlchemy** — ORM
 - **LangGraph** — Agent state machine
 - **Google Gemini API**
-  - `gemini-pro` for planning, reasoning, and evaluation
-  - `gemini-1.5-flash` for fast interventions
+  - `gemini-2.5-flash` for all AI operations (planning, reasoning, evaluation, interventions)
 - **Opik** — Observability, experiment tracking, evaluation
 
 ### Frontend
@@ -122,6 +143,10 @@ Commitment Broker is implemented as a closed-loop agent system orchestrated with
 - **TypeScript**
 - **TailwindCSS**
 - **shadcn/ui**
+- **wagmi, viem, RainbowKit** — Wallet connect and Sepolia escrow
+
+### Contracts (Escrow)
+- **Solidity ^0.8.20**, **Hardhat**, **OpenZeppelin** — CommitmentEscrow on Ethereum Sepolia
 
 ### Infrastructure
 - **Docker & Docker Compose**
@@ -131,11 +156,12 @@ Commitment Broker is implemented as a closed-loop agent system orchestrated with
 
 ### Prerequisites
 
-- Python 3.11+
-- Node.js 18+
-- Docker and Docker Compose
-- Google Gemini API key
-- Opik API key (optional, but recommended)
+- **Python 3.11+ or 3.13** (tested with Python 3.13)
+- **Node.js 18+**
+- **Docker and Docker Compose** (for PostgreSQL)
+- **Google Gemini API key** (get from [Google AI Studio](https://aistudio.google.com/apikey))
+- **Opik API key** (optional, but recommended - get from [Comet Opik](https://www.comet.com/opik))
+- **Sepolia testnet ETH** (optional, for escrow feature)
 
 ### Environment Setup
 
@@ -149,6 +175,11 @@ cp .env.example .env
 GEMINI_API_KEY=your_gemini_api_key_here
 OPIK_API_KEY=your_opik_api_key_here
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/commitment_broker
+
+# Escrow (optional, Sepolia)
+ESCROW_CONTRACT_ADDRESS=0x...   # after deploying contracts/CommitmentEscrow
+CHAIN_ID=11155111
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=...  # WalletConnect Cloud, for frontend wallet
 ```
 
 ### Backend Setup
@@ -158,10 +189,10 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/commitment_broker
 cd backend
 ```
 
-2. Create virtual environment:
+2. Create virtual environment (named `env`):
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python -m venv env
+source env/bin/activate  # On Windows: env\Scripts\activate
 ```
 
 3. Install dependencies:
@@ -169,29 +200,29 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+> **Note for Python 3.13 users:** If you encounter compatibility issues, the dependencies will be automatically upgraded during installation. SQLAlchemy 2.0.46+ and Pydantic 2.9+ are required for Python 3.13 support.
+
 4. Start PostgreSQL with Docker Compose:
 ```bash
 cd ..
 docker-compose up -d postgres
 ```
 
-5. Run database migrations (if using Alembic):
+5. Database tables are created automatically on first run. To seed demo data:
 ```bash
 cd backend
-alembic upgrade head
-```
-
-6. Seed demo data:
-```bash
+source env/bin/activate
 python -m app.seed_demo
 ```
 
-7. Start the backend server:
+6. Start the backend server:
 ```bash
-uvicorn app.main:app --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 The API will be available at `http://localhost:8000`
+
+**View the seeded demo:** After seeding, visit `http://localhost:3000/commitments/14` to see the AI-generated commitment plan with drift detection and interventions.
 
 ### Frontend Setup
 

@@ -2,10 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useChainId } from "wagmi";
 import { cn } from "@/lib/utils";
+
+const SEPOLIA_CHAIN_ID = 11155111;
 
 export function Navigation() {
   const pathname = usePathname();
+  const chainId = useChainId();
+  const isSepolia = chainId === SEPOLIA_CHAIN_ID;
 
   return (
     <nav
@@ -74,6 +80,19 @@ export function Navigation() {
           >
             Evaluation
           </Link>
+          <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 backdrop-blur-sm">
+            {isSepolia && (
+              <span className="text-xs font-medium text-muted-foreground">Sepolia</span>
+            )}
+            {!isSepolia && chainId !== 0 && (
+              <span className="text-xs font-medium text-amber-500">Switch to Sepolia</span>
+            )}
+            <ConnectButton
+              chainStatus="icon"
+              showBalance={false}
+              accountStatus="avatar"
+            />
+          </div>
         </nav>
       </div>
     </nav>

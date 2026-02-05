@@ -1,57 +1,27 @@
 from typing import Dict, Any
-from collections import defaultdict
+from app.services.gemini_service import GeminiService
 
 
 async def detect_drift_node(state: Dict[str, Any]) -> Dict[str, Any]:
-    """Drift Detection Agent node - rule-based detection."""
+    """Drift Detection Agent node - uses Gemini for detection."""
     commitment_data = state.get("commitment_data", {})
     spending_data = state.get("spending_data", [])
+    gemini = GeminiService()
     
-    spending_ceiling = commitment_data.get("spending_ceiling", 0)
-    weekly_target = commitment_data.get("weekly_target", 0)
+    # Use Gemini to detect drift
+    drift_analysis = await gemini.detect_drift(commitment_data, spending_data)
     
-    # Aggregate spending by week
-    weekly_spending = defaultdict(float)
-    for entry in spending_data:
-        week = entry.get("week_number", 0)
-        amount = entry.get("amount", 0)
-        weekly_spending[week] += amount
+    # Add contextual metadata for backend persistence if missing from AI output
+    if "week_number" not in drift_analysis and spending_data:
+        drift_analysis["week_number"] = max([s.get("week_number", 0) for s in spending_data])
     
-    # Detect drift in latest week
-    if not weekly_spending:
-        return {
-            "drift_analysis": {
-                "has_drift": False,
-                "drift_type": None,
-                "severity": "low",
-                "description": "No spending data yet",
-                "deviation_amount": 0,
-                "week_number": None,
-                "actual_spending": 0,
-                "spending_ceiling": spending_ceiling
-            },
-            "status": "no_drift"
-        }
+    if "actual_spending" not in drift_analysis and spending_data and "week_number" in drift_analysis:
+        latest_week = drift_analysis["week_number"]
+        drift_analysis["actual_spending"] = sum([s.get("amount", 0) for s in spending_data if s.get("week_number") == latest_week])
     
-    latest_week = max(weekly_spending.keys())
-    latest_spending = weekly_spending[latest_week]
-    deviation = latest_spending - spending_ceiling
+    drift_analysis["spending_ceiling"] = commitment_data.get("spending_ceiling", 0)
     
-    # Determine drift
-    has_drift = deviation > 0
-    severity = "high" if deviation > spending_ceiling * 0.5 else "medium" if deviation > 0 else "low"
-    drift_type = "volume" if has_drift else None
-    
-    drift_analysis = {
-        "has_drift": has_drift,
-        "drift_type": drift_type,
-        "severity": severity,
-        "description": f"Spending ${latest_spending:.2f} in week {latest_week}, exceeding ceiling by ${deviation:.2f}" if has_drift else f"Spending ${latest_spending:.2f} in week {latest_week}, within limits",
-        "deviation_amount": deviation if has_drift else 0,
-        "week_number": latest_week,
-        "actual_spending": latest_spending,
-        "spending_ceiling": spending_ceiling
-    }
+    has_drift = drift_analysis.get("has_drift", False)
     
     return {
         "drift_analysis": drift_analysis,

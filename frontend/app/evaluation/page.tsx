@@ -581,6 +581,46 @@ function EvaluationPageContent() {
                 </CardContent>
               </Card>
             </motion.div>
+
+                {snapshot?.escrow_metrics && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.55 }}
+                    className="md:col-span-2 lg:col-span-3"
+                  >
+                    <Card className="border-primary/20 bg-primary/5">
+                      <CardHeader>
+                        <CardTitle className="text-section-heading">Escrow Metrics</CardTitle>
+                        <CardDescription className="text-base">
+                          On-chain escrow follow-through and lock-period behavior
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          {typeof snapshot.escrow_metrics.escrow_follow_through_rate === "number" && (
+                            <MetricStat
+                              label="Escrow Follow-Through Rate"
+                              value={`${(snapshot.escrow_metrics.escrow_follow_through_rate * 100).toFixed(1)}%`}
+                            />
+                          )}
+                          {typeof snapshot.escrow_metrics.time_to_withdrawal_days === "number" && (
+                            <MetricStat
+                              label="Time to Withdrawal (days)"
+                              value={snapshot.escrow_metrics.time_to_withdrawal_days}
+                            />
+                          )}
+                          {snapshot.escrow_metrics.drift_reduction_during_lock && (
+                            <MetricStat
+                              label="Drift Reduction During Lock"
+                              value={String(snapshot.escrow_metrics.drift_reduction_during_lock)}
+                            />
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                )}
               </>
             )}
           </div>

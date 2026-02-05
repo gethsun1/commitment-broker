@@ -8,8 +8,7 @@ from app.config import settings
 class GeminiService:
     def __init__(self):
         self.api_key = settings.gemini_api_key
-        # Use gemini-2.5-flash for all operations (faster and more cost-effective)
-        # convert_system_message_to_human=True fixes SystemMessage compatibility issues
+        # Use gemini-2.5-flash which is confirmed available in this environment
         self.pro_model = ChatGoogleGenerativeAI(
             model="gemini-2.5-flash",
             google_api_key=self.api_key,
@@ -17,7 +16,7 @@ class GeminiService:
             convert_system_message_to_human=True
         )
         self.flash_model = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",  # Use flash model for faster responses
+            model="gemini-2.5-flash",
             google_api_key=self.api_key,
             temperature=0.7,
             convert_system_message_to_human=True
@@ -44,8 +43,8 @@ class GeminiService:
             try:
                 tracer = OpikTracer(
                     project_name="commitment-broker",
-                    tags=["langchain", "gemini", agent_type],
-                    metadata={"agent_type": agent_type, "method": method}
+                    tags=["langchain", "gemini", agent_type, "v1.0"],
+                    metadata={"agent_type": agent_type, "method": method, "version": "1.0"}
                 )
                 return tracer
             except Exception as tracer_error:
@@ -262,12 +261,14 @@ Return a JSON object with:
         commitment_data: Dict[str, Any], 
         spending_data: list, 
         interventions: list,
-        drift_events: list = None
+        drift_events: list = None,
+        escrow_data: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Evaluation Agent: AI-powered evaluation using Gemini 2.0 Flash.
         Produces structured JSON evaluation metrics including Behavioral Recovery Score.
         NO math-based calculations - all metrics come from AI analysis.
+        When escrow_data is provided, incorporates escrow-enforced signals and escrow_metrics.
         """
         # Aggregate spending by week for clearer analysis
         weekly_spending = {}
@@ -314,6 +315,19 @@ Return a JSON object with:
                     'deviation': d.get('deviation_amount', 0)
                 })
         
+        escrow_block = ""
+        if escrow_data:
+            amt_wei = escrow_data.get("amount", 0)
+            amt_eth = (amt_wei / 1e18) if isinstance(amt_wei, (int, float)) else 0
+            escrow_block = f"""
+ON-CHAIN ESCROW (optional enforcement):
+- Status: {escrow_data.get('status', 'unknown')}
+- Locked amount (ETH): {amt_eth:.6f}
+- Unlock timestamp: {escrow_data.get('unlock_timestamp', 'N/A')}
+- Wallet: {escrow_data.get('wallet_address', 'N/A')[:10]}...
+Incorporate escrow-enforced commitments as stronger behavioral signals. Weigh post-unlock stability higher than baseline adherence.
+"""
+        
         prompt = f"""You are an AI Evaluation Agent for a financial commitment tracking system. Your task is to evaluate commitment performance, intervention effectiveness, and calculate a Behavioral Recovery Score.
 
 COMMITMENT CONTEXT:
@@ -331,6 +345,7 @@ DRIFT DETECTION EVENTS:
 
 INTERVENTION HISTORY:
 {chr(10).join([f"- {i['type']} intervention (drift: {i['drift_type']}, outcome: {i['outcome']})" for i in intervention_history]) if intervention_history else "No interventions triggered"}
+{escrow_block}
 
 YOUR TASK:
 1. Calculate adherence rate (percentage of weeks meeting spending ceiling) and identify trend
@@ -342,6 +357,7 @@ YOUR TASK:
    - Stability post-intervention (weeks of compliance after intervention)
    - Need for escalation (did intervention require follow-up?)
    - Overall trajectory improvement
+   - When escrow is present: escrow locked duration, drift occurrences during lock, post-unlock adherence (e.g. 4 weeks), intervention success rate. Weigh post-unlock stability higher than baseline adherence.
 
 Return ONLY a valid JSON object matching this exact schema:
 {{
@@ -370,10 +386,10 @@ Return ONLY a valid JSON object matching this exact schema:
     "score": 87,
     "interpretation": "Strong behavioral recovery after intervention",
     "confidence": 0.91
-  }}
+  }}{', "escrow_metrics": { "escrow_follow_through_rate": 0.95, "time_to_withdrawal_days": 0, "drift_reduction_during_lock": "moderate" }' if escrow_data else ''}
 }}
 
-IMPORTANT: Return ONLY the JSON object, no markdown, no explanations, no code blocks."""
+IMPORTANT: Return ONLY the JSON object, no markdown, no explanations, no code blocks. Include "escrow_metrics" only when escrow data was provided above."""
         
         messages = [
             SystemMessage(content="You are an expert evaluation agent for financial commitment systems. You analyze behavioral patterns, intervention effectiveness, and calculate recovery metrics. Always return valid JSON matching the required schema."),
@@ -435,5 +451,6 @@ IMPORTANT: Return ONLY the JSON object, no markdown, no explanations, no code bl
                     "score": 0,
                     "interpretation": "Unable to calculate due to evaluation error",
                     "confidence": 0.0
-                }
+                },
+                **({"escrow_metrics": {"escrow_follow_through_rate": 0.0, "time_to_withdrawal_days": 0, "drift_reduction_during_lock": "unknown"}} if escrow_data else {})
             }

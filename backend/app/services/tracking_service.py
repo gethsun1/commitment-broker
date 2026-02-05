@@ -7,6 +7,7 @@ from app.models.commitment import Commitment
 from app.models.intervention import Intervention, InterventionType
 from app.models.evaluation import Evaluation
 from app.services.gemini_service import GeminiService
+from app.services.escrow_service import get_escrow_status
 from app.observability.opik_client import OpikClient
 from app.agents.evaluation_agent import evaluate_node
 from app.agents.graph import CommitmentState
@@ -180,6 +181,8 @@ class TrackingService:
                     "deviation_amount": 0  # Could be calculated if stored
                 })
         
+        escrow_data = get_escrow_status(db, commitment_id)
+        
         # Create evaluation workflow
         evaluation_graph = StateGraph(CommitmentState)
         evaluation_graph.add_node("evaluate", evaluate_node)
@@ -188,6 +191,7 @@ class TrackingService:
         compiled_evaluation = evaluation_graph.compile()
         
         # Wrap with Opik tracing if available
+        escrow_enabled = bool(escrow_data)
         try:
             from opik.integrations.langchain import OpikTracer, track_langgraph
             import os
@@ -197,7 +201,10 @@ class TrackingService:
                     opik_tracer = OpikTracer(
                         project_name="commitment-broker",
                         tags=["langchain", "langgraph", "evaluation_workflow"],
-                        metadata={"workflow_type": "evaluation_only"}
+                        metadata={
+                            "workflow_type": "evaluation_only",
+                            "escrow_enabled": escrow_enabled,
+                        }
                     )
                     compiled_evaluation = track_langgraph(compiled_evaluation, opik_tracer)
                 except Exception:
@@ -217,6 +224,7 @@ class TrackingService:
             "evaluation": {},
             "interventions": intervention_list,
             "drift_events": drift_events,
+            "escrow_data": escrow_data,
             "status": "evaluating"
         }
         
@@ -274,21 +282,32 @@ class TrackingService:
         # Log evaluation metrics to Opik
         if self.opik:
             try:
+                meta: Dict[str, Any] = {
+                    "commitment_id": commitment_id,
+                    "weeks_tracked": total_weeks,
+                    "total_interventions": len(interventions),
+                    "escrow_enabled": escrow_enabled,
+                }
+                metrics_payload: Dict[str, Any] = {
+                    "adherence_rate": adherence_rate,
+                    "behavioral_recovery_score": behavioral_recovery.get("score", 0),
+                    "intervention_success_rate": intervention_success_rate or 0,
+                    "drift_classification_confidence": drift_analysis_data.get("classification_confidence", 0),
+                }
+                if escrow_enabled and escrow_data:
+                    metrics_payload["escrow_amount_wei"] = escrow_data.get("amount")
+                    metrics_payload["escrow_status"] = escrow_data.get("status")
+                escrow_metrics_data = evaluation_json.get("escrow_metrics")
+                if escrow_metrics_data:
+                    metrics_payload["escrow_follow_through_rate"] = escrow_metrics_data.get("escrow_follow_through_rate")
+                    metrics_payload["time_to_withdrawal_days"] = escrow_metrics_data.get("time_to_withdrawal_days")
+                    metrics_payload["drift_reduction_during_lock"] = escrow_metrics_data.get("drift_reduction_during_lock")
                 await self.opik.log_experiment(
                     experiment_name="evaluation_run",
                     prompt_version="v1",
                     agent_type="evaluation_agent",
-                    metrics={
-                        "adherence_rate": adherence_rate,
-                        "behavioral_recovery_score": behavioral_recovery.get("score", 0),
-                        "intervention_success_rate": intervention_success_rate or 0,
-                        "drift_classification_confidence": drift_analysis_data.get("classification_confidence", 0)
-                    },
-                    metadata={
-                        "commitment_id": commitment_id,
-                        "weeks_tracked": total_weeks,
-                        "total_interventions": len(interventions)
-                    }
+                    metrics=metrics_payload,
+                    metadata=meta
                 )
             except Exception as e:
                 print(f"⚠️  Opik evaluation logging failed: {e}")

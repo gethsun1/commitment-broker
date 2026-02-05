@@ -89,6 +89,51 @@ def run_evaluation_fields_migration():
         return False
 
 
+def run_escrow_migration():
+    """
+    Create escrow_commitments table if not exists.
+    Idempotent; safe to run multiple times.
+    """
+    migration_sql = """
+    CREATE TABLE IF NOT EXISTS escrow_commitments (
+        id SERIAL PRIMARY KEY,
+        commitment_id INTEGER NOT NULL UNIQUE REFERENCES commitments(id),
+        wallet_address VARCHAR(42) NOT NULL,
+        tx_hash VARCHAR(66),
+        amount BIGINT NOT NULL,
+        unlock_timestamp BIGINT NOT NULL,
+        chain_id INTEGER NOT NULL DEFAULT 11155111,
+        contract_address VARCHAR(42) NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'LOCKED',
+        commitment_hash VARCHAR(66) NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        unlocked_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS ix_escrow_commitments_commitment_id ON escrow_commitments(commitment_id);
+    CREATE INDEX IF NOT EXISTS ix_escrow_commitments_wallet_address ON escrow_commitments(wallet_address);
+    CREATE INDEX IF NOT EXISTS ix_escrow_commitments_commitment_hash ON escrow_commitments(commitment_hash);
+    """
+    try:
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        if "escrow_commitments" in tables:
+            logger.info("✅ Escrow migration already applied (table exists).")
+            return True
+        if "commitments" not in tables:
+            logger.warning("⚠️  Commitments table does not exist. Skipping escrow migration.")
+            return False
+        logger.info("🔄 Running escrow migration...")
+        with engine.begin() as conn:
+            for stmt in [s.strip() for s in migration_sql.strip().split(";") if s.strip()]:
+                if stmt:
+                    conn.execute(text(stmt))
+        logger.info("✅ Escrow migration completed successfully.")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Escrow migration failed: {e}")
+        return False
+
+
 def check_migration_status():
     """Check if migration has been applied."""
     try:

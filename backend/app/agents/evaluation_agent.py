@@ -17,6 +17,7 @@ async def evaluate_node(state: Dict[str, Any]) -> Dict[str, Any]:
     spending_data = state.get("spending_data", [])
     interventions = state.get("interventions", [])
     drift_analysis = state.get("drift_analysis", {})
+    escrow_data = state.get("escrow_data")
     
     # Collect drift events - if drift_analysis exists, include it as a drift event
     drift_events = []
@@ -60,7 +61,8 @@ async def evaluate_node(state: Dict[str, Any]) -> Dict[str, Any]:
         commitment_data=commitment_data,
         spending_data=spending_data,
         interventions=formatted_interventions,
-        drift_events=drift_events
+        drift_events=drift_events,
+        escrow_data=escrow_data
     )
     
     return {

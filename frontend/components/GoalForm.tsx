@@ -116,10 +116,10 @@ export function GoalForm() {
                 formData.timeframe.includes("3")
                   ? "3"
                   : formData.timeframe.includes("6")
-                  ? "6"
-                  : formData.timeframe.includes("12")
-                  ? "12"
-                  : ""
+                    ? "6"
+                    : formData.timeframe.includes("12")
+                      ? "12"
+                      : ""
               }
               onChange={(e) => handleTimeframeChange(e.target.value)}
               className="flex h-12 w-full rounded-md border border-input bg-background px-4 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -199,6 +199,15 @@ export function GoalForm() {
               />
             </Button>
           </motion.div>
+
+          {/* AI Disclaimer */}
+          <div className="pt-4 border-t border-white/5">
+            <p className="text-[10px] text-center text-muted-foreground leading-relaxed">
+              <strong>General Disclaimer:</strong> This system uses AI to structure financial goals and monitor behavior.
+              The generated plans and interventions are for discipline-building purposes only and do <strong>not</strong> constitute
+              financial, investment, or legal advice. Use this tool at your own discretion.
+            </p>
+          </div>
         </form>
       </CardContent>
     </Card>

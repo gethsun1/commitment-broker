@@ -11,7 +11,9 @@ import { InterventionAlert } from "@/components/InterventionAlert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricStat } from "@/components/MetricStat";
 import { InterventionBadge } from "@/components/InterventionBadge";
-import { apiClient, Commitment, Spending, Intervention, Evaluation, Drift } from "@/lib/api";
+import { apiClient, Commitment, Spending, Intervention, Evaluation, Drift, EscrowStatus } from "@/lib/api";
+import { EscrowOptInCard } from "@/components/EscrowOptInCard";
+import { EscrowStatusBadge } from "@/components/EscrowStatusBadge";
 
 export default function CommitmentPage() {
   const params = useParams();
@@ -23,18 +25,20 @@ export default function CommitmentPage() {
   const [interventions, setInterventions] = useState<Intervention[]>([]);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [drift, setDrift] = useState<Drift | null>(null);
+  const [escrow, setEscrow] = useState<EscrowStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [commitmentData, spendingData, interventionsData, evaluationData, driftData] =
+      const [commitmentData, spendingData, interventionsData, evaluationData, driftData, escrowData] =
         await Promise.all([
           apiClient.commitments.get(commitmentId),
           apiClient.commitments.getSpending(commitmentId),
           apiClient.commitments.getInterventions(commitmentId),
           apiClient.commitments.getEvaluation(commitmentId).catch(() => null),
           apiClient.commitments.getDrift(commitmentId).catch(() => null),
+          apiClient.escrow.get(commitmentId).catch(() => null),
         ]);
 
       setCommitment(commitmentData);
@@ -42,6 +46,7 @@ export default function CommitmentPage() {
       setInterventions(interventionsData);
       setEvaluation(evaluationData);
       setDrift(driftData);
+      setEscrow(escrowData ?? null);
     } catch (error) {
       console.error("Error loading data:", error);
       alert("Failed to load commitment data.");
@@ -103,6 +108,12 @@ export default function CommitmentPage() {
         </motion.div>
 
         <CommitmentCard commitment={commitment} />
+
+        {escrow ? (
+          <EscrowStatusBadge escrow={escrow} onWithdrawn={loadData} />
+        ) : (
+          <EscrowOptInCard commitment={commitment} onEscrowCreated={loadData} />
+        )}
 
         {interventions.length > 0 && (
           <motion.div

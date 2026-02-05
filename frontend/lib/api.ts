@@ -106,6 +106,11 @@ export interface Evaluation {
       interpretation?: string;
       confidence?: number;
     };
+    escrow_metrics?: {
+      escrow_follow_through_rate?: number;
+      time_to_withdrawal_days?: number;
+      drift_reduction_during_lock?: string;
+    };
   };
   behavioral_recovery_score?: number;
   behavioral_recovery_interpretation?: string;
@@ -117,6 +122,35 @@ export interface Evaluation {
   drift_detection_precision?: number;
   intervention_timing?: string;
   average_deviation?: number;
+}
+
+export interface EscrowInitResponse {
+  commitment_id: string;
+  unlock_timestamp: number;
+  contract_address: string;
+  chain_id: number;
+}
+
+export interface EscrowConfirmRequest {
+  commitment_id: number;
+  wallet_address: string;
+  tx_hash: string;
+  amount: number | string;
+}
+
+export interface EscrowStatus {
+  id: number;
+  commitment_id: number;
+  wallet_address: string;
+  tx_hash?: string;
+  amount: number;
+  unlock_timestamp: number;
+  chain_id: number;
+  contract_address: string;
+  status: "LOCKED" | "UNLOCKED" | "WITHDRAWN";
+  commitment_hash: string;
+  created_at?: string;
+  unlocked_at?: string;
 }
 
 export const apiClient = {
@@ -165,6 +199,23 @@ export const apiClient = {
   interventions: {
     updateOutcome: async (id: number, outcome: string): Promise<void> => {
       await api.patch(`/interventions/${id}/outcome?outcome=${outcome}`);
+    },
+  },
+  escrow: {
+    init: async (commitmentId: number): Promise<EscrowInitResponse> => {
+      const response = await api.post("/escrow/init", { commitment_id: commitmentId });
+      return response.data;
+    },
+    confirm: async (payload: EscrowConfirmRequest): Promise<{ status: string; escrow_id: number; commitment_id: number }> => {
+      const response = await api.post("/escrow/confirm", payload);
+      return response.data;
+    },
+    get: async (commitmentId: number): Promise<EscrowStatus> => {
+      const response = await api.get(`/escrow/${commitmentId}`);
+      return response.data;
+    },
+    markWithdrawn: async (commitmentId: number): Promise<void> => {
+      await api.patch(`/escrow/${commitmentId}/withdrawn`);
     },
   },
 };

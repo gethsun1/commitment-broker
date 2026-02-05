@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from app.models.intervention import InterventionType
@@ -97,3 +97,46 @@ class EvaluationResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# Escrow (on-chain commitment)
+
+
+class EscrowInitRequest(BaseModel):
+    commitment_id: int
+
+
+class EscrowInitResponse(BaseModel):
+    commitment_id: str  # bytes32 hash as 0x-prefixed hex
+    unlock_timestamp: int
+    contract_address: str
+    chain_id: int
+
+
+class EscrowConfirmRequest(BaseModel):
+    commitment_id: int
+    wallet_address: str = Field(..., min_length=40, max_length=42)
+    tx_hash: str = Field(..., min_length=64, max_length=66)
+    amount: int = Field(..., gt=0)  # wei
+
+    @field_validator("amount", mode="before")
+    @classmethod
+    def coerce_amount(cls, v: Any) -> int:
+        if isinstance(v, str):
+            return int(v)
+        return int(v) if v is not None else 0
+
+
+class EscrowStatusResponse(BaseModel):
+    id: int
+    commitment_id: int
+    wallet_address: str
+    tx_hash: Optional[str]
+    amount: int
+    unlock_timestamp: int
+    chain_id: int
+    contract_address: str
+    status: str  # LOCKED | UNLOCKED | WITHDRAWN
+    commitment_hash: str
+    created_at: Optional[str]
+    unlocked_at: Optional[str]

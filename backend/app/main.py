@@ -57,8 +57,9 @@ try:
     print("✅ Database tables created/verified successfully")
     
     # Run automatic migrations
-    from app.database_migrations import run_evaluation_fields_migration
+    from app.database_migrations import run_evaluation_fields_migration, run_escrow_migration
     run_evaluation_fields_migration()
+    run_escrow_migration()
 except Exception as db_error:
     print(f"⚠️  Database initialization warning: {db_error}")
     print("   Tables will be created on first database connection.")
